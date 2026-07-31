@@ -1,0 +1,38 @@
+{
+  "run_id": "20260731-164529-edit-article-clarity",
+  "fixture": "edit-article-clarity",
+  "skill": "C:\\Users\\15479\\.codex\\skills\\edit-article",
+  "cli": "mock",
+  "ci_mode": true,
+  "timestamp": "20260731-164529",
+  "attempts": [
+    {
+      "index": 0,
+      "agent_exit": 1,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": false,
+          "detail": "output/edited.md missing"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": false,
+          "detail": "output/edited.md missing"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": false,
+          "detail": "output/edited.md missing"
+        }
+      ],
+      "asserts_passed": 0,
+      "asserts_total": 3,
+      "judge": null,
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-0-2ubgj_bq",
+      "trace": "attempt-0.trace.json.gz"
+    }
+  ],
+  "asserts_pass_rate": 0.0,
+  "judge_scores": []
+}

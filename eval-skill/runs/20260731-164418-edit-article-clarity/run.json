@@ -1,0 +1,112 @@
+{
+  "run_id": "20260731-164418-edit-article-clarity",
+  "fixture": "edit-article-clarity",
+  "skill": "C:\\Users\\15479\\.codex\\skills\\edit-article",
+  "cli": "mock",
+  "ci_mode": false,
+  "timestamp": "20260731-164418",
+  "attempts": [
+    {
+      "index": 0,
+      "agent_exit": 0,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": true,
+          "detail": "output/edited.md found"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": true,
+          "detail": "2 pattern(s) ok"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": true,
+          "detail": "15 lines (need >= 10)"
+        }
+      ],
+      "asserts_passed": 3,
+      "asserts_total": 3,
+      "judge": {
+        "structure": 4,
+        "clarity": 4,
+        "fidelity": 4,
+        "total": 4,
+        "notes": "mock judge"
+      },
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-0-mha5819h",
+      "trace": "attempt-0.trace.json.gz"
+    },
+    {
+      "index": 1,
+      "agent_exit": 0,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": true,
+          "detail": "output/edited.md found"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": true,
+          "detail": "2 pattern(s) ok"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": true,
+          "detail": "15 lines (need >= 10)"
+        }
+      ],
+      "asserts_passed": 3,
+      "asserts_total": 3,
+      "judge": {
+        "structure": 4,
+        "clarity": 4,
+        "fidelity": 4,
+        "total": 4,
+        "notes": "mock judge"
+      },
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-1-fi8yf0ht",
+      "trace": "attempt-1.trace.json.gz"
+    },
+    {
+      "index": 2,
+      "agent_exit": 0,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": true,
+          "detail": "output/edited.md found"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": true,
+          "detail": "2 pattern(s) ok"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": true,
+          "detail": "15 lines (need >= 10)"
+        }
+      ],
+      "asserts_passed": 3,
+      "asserts_total": 3,
+      "judge": {
+        "structure": 4,
+        "clarity": 4,
+        "fidelity": 4,
+        "total": 4,
+        "notes": "mock judge"
+      },
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-2-vpbxp_j_",
+      "trace": "attempt-2.trace.json.gz"
+    }
+  ],
+  "asserts_pass_rate": 1.0,
+  "judge_scores": [
+    4,
+    4,
+    4
+  ]
+}

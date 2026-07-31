@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+"""eval-skill runner: run fixtures against a SKILL.md target, judge, report.
+
+Commands:
+  run      Execute a fixture N times, apply deterministic asserts + LLM judge
+  report   Render runs/*.json into an HTML report
+  init     Scaffold a new fixture directory
+
+Stdlib only (plus a tiny vendored YAML-subset parser for fixture files).
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import gzip
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+RUNS_DIR = ROOT / "runs"
+
+
+# ---------------------------------------------------------------- yaml-lite
+
+def parse_scalar(text: str):
+    text = text.strip()
+    if not text:
+        return ""
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        pass
+    if (text.startswith('"') and text.endswith('"')) or (
+        text.startswith("'") and text.endswith("'")
+    ):
+        return text[1:-1]
+    return text
+
+
+def parse_simple_yaml(text: str):
+    """Parse the small YAML subset used by fixture.yaml files.
+
+    Supports: nested mappings, lists of mappings, inline scalars,
+    block scalars with '>', single-line lists of scalars under a key.
+    """
+    lines = [ln for ln in text.splitlines()]
+    root: dict = {}
+    stack: list[tuple[int, object]] = [(-1, root)]
+    last_key_at_indent: dict[int, tuple[dict, str]] = {}
+    fold_target: list | None = None  # [container, key, indent]
+
+    for raw in lines:
+        if not raw.strip() or raw.strip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        stripped = raw.strip()
+
+        if fold_target is not None:
+            container, key, findent = fold_target
+            if indent > findent:
+                container[key] = (container[key] + " " + stripped).strip()
+                continue
+            fold_target = None
+
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        parent = stack[-1][1]
+
+        if stripped.startswith("- "):
+            item_text = stripped[2:]
+            if not isinstance(parent, list):
+                pcontainer, pkey = last_key_at_indent[stack[-1][0]]
+                new_list: list = []
+                pcontainer[pkey] = new_list
+                parent = new_list
+                stack.append((stack[-1][0], parent))
+            if ":" in item_text:
+                k, _, v = item_text.partition(":")
+                item: dict = {k.strip(): parse_scalar(v)}
+                parent.append(item)
+                stack.append((indent, item))
+                last_key_at_indent[indent] = (item, k.strip())
+            else:
+                parent.append(parse_scalar(item_text))
+            continue
+
+        key, _, value = stripped.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if value == ">":
+            parent[key] = ""
+            fold_target = [parent, key, indent]
+        elif value == "":
+            child: dict = {}
+            parent[key] = child
+            stack.append((indent, child))
+            last_key_at_indent[indent] = (parent, key)
+        else:
+            parent[key] = parse_scalar(value)
+            last_key_at_indent[indent] = (parent, key)
+
+    return root
+
+
+# ---------------------------------------------------------------- assertions
+
+def run_assertions(asserts: list, workdir: Path) -> list[dict]:
+    results = []
+    for a in asserts or []:
+        atype = a.get("type")
+        target = workdir / a.get("path", "")
+        ok, detail = True, ""
+        if atype == "file_exists":
+            ok = target.exists()
+            detail = f"{a['path']} {'found' if ok else 'missing'}"
+        elif atype == "file_not_exists":
+            ok = not target.exists()
+            detail = f"{a['path']} {'absent' if ok else 'should not exist'}"
+        elif atype in ("file_contains", "file_not_contains"):
+            if not target.exists():
+                ok, detail = False, f"{a['path']} missing"
+            else:
+                content = target.read_text(encoding="utf-8", errors="replace")
+                for pat in a.get("patterns", []):
+                    found = re.search(pat, content) is not None
+                    if atype == "file_contains" and not found:
+                        ok, detail = False, f"pattern /{pat}/ not found"
+                        break
+                    if atype == "file_not_contains" and found:
+                        ok, detail = False, f"forbidden pattern /{pat}/ found"
+                        break
+                else:
+                    detail = f"{len(a.get('patterns', []))} pattern(s) ok"
+        elif atype == "file_min_lines":
+            if not target.exists():
+                ok, detail = False, f"{a['path']} missing"
+            else:
+                n = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
+                ok = n >= int(a.get("count", 0))
+                detail = f"{n} lines (need >= {a.get('count')})"
+        elif atype == "command":
+            proc = subprocess.run(
+                a["run"], shell=True, cwd=workdir,
+                capture_output=True, text=True, timeout=120,
+            )
+            ok = proc.returncode == 0
+            detail = f"exit {proc.returncode}"
+        else:
+            ok, detail = False, f"unknown assert type: {atype}"
+        results.append({"type": atype, "ok": ok, "detail": detail})
+    return results
+
+
+# ---------------------------------------------------------------- agent
+
+def build_task_prompt(skill_dir: Path, task_text: str) -> str:
+    skill_md = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    return (
+        "You must strictly follow the skill below while completing the task.\n\n"
+        "<skill>\n" + skill_md + "\n</skill>\n\n"
+        "<task>\n" + task_text + "\n</task>\n\n"
+        "Work autonomously; do not ask for confirmation."
+    )
+
+
+def build_judge_prompt(rubric_text: str) -> str:
+    return (
+        "You are grading your own just-completed work against a rubric. "
+        "Be honest and critical.\n\n<rubric>\n" + rubric_text + "\n</rubric>\n"
+    )
+
+
+def agent_cmd(cli: str, prompt: str, workdir: Path) -> list[str]:
+    if cli == "codex":
+        return [
+            "codex", "exec", "--skip-git-repo-check",
+            "--sandbox", "workspace-write", "-C", str(workdir), prompt,
+        ]
+    if cli == "claude":
+        return ["claude", "-p", prompt, "--dangerously-skip-permissions"]
+    raise SystemExit(f"unknown CLI: {cli}")
+
+
+def run_mock_agent(prompt: str, workdir: Path) -> dict:
+    """Deterministic stand-in for a real agent CLI.
+
+    Use for validating the eval pipeline itself (fixtures, asserts,
+    reporting) when no real CLI is available. Judge prompts return a
+    fixed rubric-shaped JSON; task prompts materialize the fixture's
+    expected output so asserts can be exercised. Pass EVAL_MOCK_BEHAVIOR
+    =ok|fail to test the failure path.
+    """
+    behavior = os.environ.get("EVAL_MOCK_BEHAVIOR", "ok")
+    if "<rubric>" in prompt:
+        total = 4 if behavior == "ok" else 2
+        payload = json.dumps({"structure": 4, "clarity": 4, "fidelity": 4,
+                              "total": total, "notes": "mock judge"})
+        return {
+            "cmd": "mock", "exit": 0,
+            "stdout": payload,
+            "stderr": "",
+        }
+    if behavior == "ok":
+        (workdir / "output").mkdir(parents=True, exist_ok=True)
+        (workdir / "output" / "edited.md").write_text(
+            "# Why our deploy pipeline is slow\n\n"
+            "The pipeline is slow for two reasons.\n\n"
+            "## Sequential tests\n\n"
+            "Tests run one after another, so total time is the sum of all "
+            "test times.\n\n"
+            "## No build caching\n\n"
+            "The build rebuilds everything even when most packages are "
+            "unchanged. Caching stores results so they need not be "
+            "recomputed.\n\n"
+            "## Fixes\n\n"
+            "Parallelize the tests and cache the build.\n",
+            encoding="utf-8")
+        return {"cmd": "mock", "exit": 0, "stdout": "mock task done", "stderr": ""}
+    return {"cmd": "mock", "exit": 1, "stdout": "", "stderr": "mock failure"}
+
+
+def invoke_agent(cli: str, prompt: str, workdir: Path) -> dict:
+    if cli == "mock":
+        return run_mock_agent(prompt, workdir)
+    cmd = agent_cmd(cli, prompt, workdir)
+    try:
+        proc = subprocess.run(
+            cmd, cwd=workdir, capture_output=True, text=True,
+            timeout=int(os.environ.get("EVAL_AGENT_TIMEOUT", "900")),
+        )
+        return {
+            "cmd": " ".join(cmd[:6]) + " ...",
+            "exit": proc.returncode,
+            "stdout": proc.stdout[-8000:],
+            "stderr": proc.stderr[-2000:],
+        }
+    except FileNotFoundError:
+        return {"cmd": cmd[0], "exit": -1, "stdout": "",
+                "stderr": f"CLI not found on PATH: {cmd[0]}"}
+    except subprocess.TimeoutExpired:
+        return {"cmd": cmd[0], "exit": -2, "stdout": "", "stderr": "timeout"}
+
+
+def extract_json(text: str):
+    m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except json.JSONDecodeError:
+        return None
+
+
+# ---------------------------------------------------------------- commands
+
+def cmd_run(args):
+    fixture_dir = Path(args.fixture).resolve()
+    spec = parse_simple_yaml((fixture_dir / "fixture.yaml").read_text(encoding="utf-8"))
+    skill_dir = Path(args.skill).resolve()
+    runs = int(args.runs or spec.get("runs", 3))
+    task_text = (fixture_dir / spec["task"]).read_text(encoding="utf-8")
+    rubric_text = ""
+    if spec.get("judge") and not args.ci:
+        rubric_text = (fixture_dir / spec["judge"]["rubric"]).read_text(encoding="utf-8")
+
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = f"{stamp}-{spec['name']}"
+    run_dir = RUNS_DIR / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    attempts = []
+    for i in range(runs):
+        workdir = Path(tempfile.mkdtemp(prefix=f"eval-{spec['name']}-{i}-"))
+        setup = fixture_dir / "setup"
+        if setup.exists():
+            shutil.copytree(setup, workdir, dirs_exist_ok=True)
+
+        task_trace = invoke_agent(
+            args.cli, build_task_prompt(skill_dir, task_text), workdir)
+        asserts = run_assertions(spec.get("assert"), workdir)
+
+        judge_result = None
+        judge_trace = None
+        if rubric_text and task_trace["exit"] == 0:
+            judge_trace = invoke_agent(args.cli, build_judge_prompt(rubric_text), workdir)
+            judge_result = extract_json(judge_trace["stdout"])
+
+        trace_gz = run_dir / f"attempt-{i}.trace.json.gz"
+        with gzip.open(trace_gz, "wt", encoding="utf-8") as fh:
+            json.dump({"task": task_trace, "judge": judge_trace}, fh, ensure_ascii=False)
+
+        attempts.append({
+            "index": i,
+            "agent_exit": task_trace["exit"],
+            "asserts": asserts,
+            "asserts_passed": sum(1 for a in asserts if a["ok"]),
+            "asserts_total": len(asserts),
+            "judge": judge_result,
+            "workdir": str(workdir),
+            "trace": trace_gz.name,
+        })
+        status = "PASS" if all(a["ok"] for a in asserts) else "FAIL"
+        print(f"[attempt {i}] asserts {status} "
+              f"({attempts[-1]['asserts_passed']}/{attempts[-1]['asserts_total']})"
+              + (f" judge={judge_result.get('total')}" if judge_result else ""))
+
+        if not args.keep_workdirs and task_trace["exit"] == 0:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    summary = {
+        "run_id": run_id,
+        "fixture": spec["name"],
+        "skill": str(skill_dir),
+        "cli": args.cli,
+        "ci_mode": args.ci,
+        "timestamp": stamp,
+        "attempts": attempts,
+        "asserts_pass_rate": (
+            sum(a["asserts_passed"] for a in attempts)
+            / max(1, sum(a["asserts_total"] for a in attempts))
+        ),
+        "judge_scores": [
+            a["judge"]["total"] for a in attempts
+            if a["judge"] and isinstance(a["judge"].get("total"), (int, float))
+        ],
+    }
+    (run_dir / "run.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"run saved -> {run_dir / 'run.json'}")
+
+    if args.ci:
+        ok = summary["asserts_pass_rate"] == 1.0
+        print("CI gate:", "PASS" if ok else "FAIL")
+        sys.exit(0 if ok else 1)
+
+
+def cmd_init(args):
+    dest = Path(args.name).resolve()
+    if dest.exists():
+        raise SystemExit(f"already exists: {dest}")
+    (dest / "setup" / "input").mkdir(parents=True)
+    (dest / "fixture.yaml").write_text(
+        "name: " + dest.name + "\n"
+        "description: TODO what this fixture checks\n"
+        "task: task.md\n"
+        "assert:\n"
+        "  - type: file_exists\n"
+        "    path: output/result.md\n"
+        "judge:\n"
+        "  rubric: rubric.md\n"
+        "  max_score: 5\n"
+        "runs: 3\n", encoding="utf-8")
+    (dest / "task.md").write_text("TODO: the task the agent must perform.\n",
+                                  encoding="utf-8")
+    (dest / "rubric.md").write_text(
+        "Score 1-5 on quality. Return JSON only: "
+        '{"total": N, "notes": "..."}.\n', encoding="utf-8")
+    (dest / "setup" / "input" / ".gitkeep").write_text("", encoding="utf-8")
+    print(f"fixture scaffolded -> {dest}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="eval")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p_run = sub.add_parser("run")
+    p_run.add_argument("--skill", required=True, help="path to skill directory")
+    p_run.add_argument("--fixture", required=True, help="path to fixture directory")
+    p_run.add_argument("--cli", default="codex",
+                       choices=["codex", "claude", "mock"])
+    p_run.add_argument("--runs", type=int, default=None)
+    p_run.add_argument("--ci", action="store_true",
+                       help="deterministic asserts only; exit non-zero on failure")
+    p_run.add_argument("--keep-workdirs", action="store_true")
+    p_run.set_defaults(fn=cmd_run)
+
+    p_init = sub.add_parser("init")
+    p_init.add_argument("name", help="new fixture directory path")
+    p_init.set_defaults(fn=cmd_init)
+
+    args = ap.parse_args()
+    args.fn(args)
+
+
+if __name__ == "__main__":
+    main()

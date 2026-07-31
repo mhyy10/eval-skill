@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>eval-skill report</title>
+<style>
+  body { font: 14px/1.5 -apple-system, "Segoe UI", sans-serif;
+         margin: 2rem auto; max-width: 900px; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  .card { border: 1px solid #ddd; border-left: 4px solid #999;
+          border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .card.pass { border-left-color: #2e9e5b; }
+  .card.fail { border-left-color: #d64545; }
+  .meta { color: #555; margin-bottom: .5rem; }
+  .delta { font-size: .85rem; color: #775500; margin-bottom: .5rem; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border: 1px solid #eee; padding: .3rem .5rem; text-align: left; }
+  tr.fail td { background: #fdecec; }
+  tr.pass td { background: #eefaf2; }
+  code { background: #f4f4f4; padding: 0 .3em; border-radius: 3px; }
+</style></head><body>
+<h1>eval-skill report &middot; 2 run(s)</h1>
+
+<section class="card fail">
+  <h2>20260731-164529-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    pass-rate <b>0%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260731-164418-edit-article-clarity: pass-rate -1.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='fail'><td>0</td><td>0/3</td><td>-</td><td></td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260731-164418-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>2</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section>
+</body></html>

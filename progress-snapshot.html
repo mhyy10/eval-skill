@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eval-skill · 开发进度快照</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3b;
+    --text:#e8eaf0; --muted:#9aa3b2; --faint:#6b7382;
+    --green:#3fb950; --green-bg:rgba(63,185,80,.12);
+    --yellow:#d29922; --yellow-bg:rgba(210,153,34,.12);
+    --red:#f85149; --red-bg:rgba(248,81,73,.12);
+    --blue:#58a6ff; --blue-bg:rgba(88,166,255,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       font-size:14px;line-height:1.6;padding:40px 48px;max-width:1180px}
+  .eyebrow{color:var(--faint);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+  h1{font-size:30px;font-weight:650;margin:6px 0 2px}
+  h1 .dim{color:var(--muted);font-weight:400}
+  .sub{color:var(--muted);margin-bottom:26px}
+  .sub code{color:var(--blue);background:var(--blue-bg);padding:1px 6px;border-radius:4px;font-size:12.5px}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:26px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .kpi .n{font-size:26px;font-weight:700;line-height:1.15}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:2px}
+  .kpi.green .n{color:var(--green)} .kpi.yellow .n{color:var(--yellow)}
+  .kpi.blue .n{color:var(--blue)} .kpi.red .n{color:var(--red)}
+  .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px}
+  .card h2{font-size:14px;font-weight:650;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card h2 .tag{font-size:11px;font-weight:500;color:var(--faint)}
+  .flow{display:flex;align-items:center;margin:14px 0 6px;flex-wrap:wrap}
+  .step{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;
+        font-size:12.5px;text-align:center}
+  .step b{display:block;font-size:13px}
+  .step span{color:var(--muted);font-size:11px}
+  .arrow{color:var(--faint);padding:0 8px;font-size:16px}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .gate{border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12.5px}
+  .gate.g{border-color:rgba(63,185,80,.35);background:var(--green-bg)}
+  .gate.b{border-color:rgba(88,166,255,.35);background:var(--blue-bg)}
+  .gate b{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .gate.g b{color:var(--green)} .gate.b b{color:var(--blue)}
+  .gate p{color:var(--muted);font-size:12px;line-height:1.5}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{color:var(--faint);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px}
+  td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.mono, code.mono{font-family:Consolas,monospace;font-size:12px;color:#c9d1d9}
+  .pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}
+  .pill.done{background:var(--green-bg);color:var(--green)}
+  .pill.wip{background:var(--yellow-bg);color:var(--yellow)}
+  .pill.todo{background:var(--red-bg);color:var(--red)}
+  .bar{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;border-radius:99px}
+  .legend{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px}
+  ul.clean{list-style:none}
+  ul.clean li{padding:5px 0 5px 20px;position:relative;color:#c9d1d9;font-size:12.8px;border-bottom:1px dashed var(--line)}
+  ul.clean li:last-child{border-bottom:none}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:13px;width:6px;height:6px;border-radius:50%;background:var(--blue)}
+  ul.clean li.done::before{background:var(--green)}
+  ul.clean li.warn::before{background:var(--yellow)}
+  ul.clean li.bad::before{background:var(--red)}
+  ul.clean li .why{color:var(--faint);font-size:11.8px}
+  .foot{color:var(--faint);font-size:11.5px;margin-top:22px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<div class="eyebrow">Skill 开发进度快照 · 2026-07-31</div>
+<h1>eval-skill <span class="dim">/ SKILL.md 技能的评测与回归测试框架</span></h1>
+<div class="sub">工作区 <code>C:\Users\15479\Documents\new-skill</code> · 全部文件尚未提交（git 无任何 commit，working tree 全为 untracked）</div>
+
+<div class="kpis">
+  <div class="kpi blue"><div class="n">8</div><div class="l">文件总数</div></div>
+  <div class="kpi"><div class="n">306</div><div class="l">eval.py 行数（核心引擎）</div></div>
+  <div class="kpi green"><div class="n">2 / 3</div><div class="l">Roadmap 之外主体功能已成型</div></div>
+  <div class="kpi yellow"><div class="n">0</div><div class="l">次真实评测运行（无 runs/ 目录）</div></div>
+  <div class="kpi red"><div class="n">0</div><div class="l">commits（代码未纳入版本控制）</div></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>评测流水线 <span class="tag">已实现的执行模型</span></h2>
+    <div class="flow">
+      <div class="step"><b>fixture</b><span>任务 + 断言 + 评分卡</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>隔离运行</b><span>setup/ 复制到临时目录</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>agent 执行</b><span>codex / claude CLI</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>两层判定</b><span>asserts + LLM judge</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>HTML 报告</b><span>runs/report.html</span></div>
+    </div>
+    <div class="split">
+      <div class="gate g">
+        <b>① 确定性断言 · CI 硬门禁</b>
+        <p>file_exists / not_exists / contains / not_contains / min_lines / command —— 只有这一层允许进 CI，<code>--ci</code> 失败即 exit 1。</p>
+      </div>
+      <div class="gate b">
+        <b>② LLM judge · 趋势信号</b>
+        <p>按 rubric 打 JSON 结构化分（含 total 与子维度），只作趋势观察，&gt;0.5/5 的跌幅才需要排查。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>整体完成度</h2>
+    <table>
+      <tr><td style="width:120px">核心运行器</td><td><span class="pill done">已成型</span></td></tr>
+      <tr><td>断言引擎</td><td><span class="pill done">6 种类型已实现</span></td></tr>
+      <tr><td>LLM judge 集成</td><td><span class="pill done">已成型</span></td></tr>
+      <tr><td>HTML 报告</td><td><span class="pill done">report.py 就绪</span></td></tr>
+      <tr><td>fixture 脚手架</td><td><span class="pill done">init 命令可用</span></td></tr>
+      <tr><td>端到端验证</td><td><span class="pill todo">未跑过一次</span></td></tr>
+      <tr><td>Roadmap 3 项</td><td><span class="pill todo">全部未开始</span></td></tr>
+    </table>
+    <div class="bar"><i style="width:62%;background:linear-gradient(90deg,var(--green),var(--yellow))"></i></div>
+    <div class="legend"><span>骨架 ≈ 62% · 缺的主要是"验证过"和版本控制</span><span>~62%</span></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>文件清单 <span class="tag">8 个文件 · 均未提交</span></h2>
+    <table>
+      <tr><th>文件</th><th>大小</th><th>最后修改</th><th>状态</th></tr>
+      <tr><td class="mono">SKILL.md</td><td>2.8 KB</td><td>07-30 16:5x</td><td><span class="pill done">技能定义完整</span></td></tr>
+      <tr><td class="mono">README.md</td><td>1.7 KB</td><td>07-30 17:4x</td><td><span class="pill done">文档 + roadmap</span></td></tr>
+      <tr><td class="mono">scripts/eval.py</td><td>12.8 KB</td><td>07-30 16:4x</td><td><span class="pill done">核心引擎 · 306 行</span></td></tr>
+      <tr><td class="mono">scripts/report.py</td><td>4.0 KB</td><td>07-30 16:5x</td><td><span class="pill done">报告渲染</span></td></tr>
+      <tr><td class="mono">fixtures/edit-article-clarity/*</td><td>4 个文件</td><td>07-30 16:4x</td><td><span class="pill done">唯一示例 fixture</span></td></tr>
+      <tr><td class="mono">runs/</td><td>—</td><td>—</td><td><span class="pill todo">不存在</span></td></tr>
+      <tr><td class="mono">tests/</td><td>—</td><td>—</td><td><span class="pill todo">框架自身无测试</span></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>设计决策 <span class="tag">SKILL.md 已沉淀的方法论</span></h2>
+    <ul class="clean">
+      <li class="done">断言与 judge 严格分层 —— <span class="why">"混在一起是最常见的 eval 错误"</span></li>
+      <li class="done">task.md 必须中和交互步骤 —— <span class="why">否则确认类技能会把运行挂死</span></li>
+      <li class="done">rubric 强制 JSON + 子维度分 —— <span class="why">分数才可趋势化、可归因</span></li>
+      <li class="done">run.json 随技能变更一起提交 —— <span class="why">文本 diff 与分数 diff 同评审</span></li>
+      <li class="done">基线人工刷新，不自动接受 —— <span class="why">防止悄悄放水</span></li>
+      <li class="warn">待验证：示例 fixture 能否真跑通 edit-article 技能</li>
+    </ul>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>下一步建议 <span class="tag">按优先级</span></h2>
+    <ul class="clean">
+      <li class="bad"><b>先跑一次示例 fixture</b> —— <span class="why">eval.py 306 行零实测，跑通才能证明骨架成立</span></li>
+      <li class="bad"><b>做首次 git commit</b> —— <span class="why">当前零版本控制，任何改动都不可回滚</span></li>
+      <li class="warn">给 eval.py 自身补单元测试 —— <span class="why">断言引擎是纯函数，最适合先测</span></li>
+      <li class="warn">再加 1-2 个 fixture —— <span class="why">覆盖不同类型技能（如 debugging 类）验证泛用性</span></li>
+      <li>Roadmap：<code>--mount</code> 真实技能加载、外部 judge 配置、多轮趋势图</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>风险</h2>
+    <table>
+      <tr><th style="width:70px">级别</th><th>问题</th></tr>
+      <tr><td><span class="pill todo">高</span></td><td>核心运行器从未实际执行，CLI 调 agent 的路径可能有未发现的坑</td></tr>
+      <tr><td><span class="pill todo">高</span></td><td>无 commit，文件损坏或误删即丢失</td></tr>
+      <tr><td><span class="pill wip">中</span></td><td>仅 1 个 fixture，无法判断框架对非文本编辑类技能的适用性</td></tr>
+      <tr><td><span class="pill wip">中</span></td><td>judge 与被测 agent 是否同模型未隔离（roadmap 已列，未做）</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="foot">
+  <span>数据来源：文件系统扫描 + SKILL.md / README.md / fixture.yaml / git status</span>
+  <span>生成于 2026-07-31 · Codex</span>
+</div>
+
+</body>
+</html>
