@@ -2,6 +2,44 @@
 
 Evaluate and regression-test SKILL.md skills. Stdlib-only Python, no deps.
 
+## Installation
+
+`eval-skill` is a skill (not an agent), so installation means copying
+the folder into whatever directory your agent treats as its skills
+root. Pick the one that matches your harness; install separately for
+each one you use.
+
+### Claude Code
+
+```bash
+./scripts/install.sh --target claude
+# or:  ./scripts/install.sh --dest ~/.claude/skills/eval-skill
+```
+
+Or clone and install manually:
+
+```bash
+git clone https://github.com/your-name/eval-skill ~/.claude/skills/eval-skill
+```
+
+### Codex CLI / Codex App
+
+```bash
+./scripts/install.sh --target codex
+# or:  ./scripts/install.sh --dest ~/.codex/skills/eval-skill
+```
+
+### Windows (PowerShell)
+
+```powershell
+.\scripts\install.ps1 -Target claude   # or -Target codex
+.\scripts\install.ps1 -Dest "C:\path\to\your\skills\eval-skill"
+```
+
+The installers symlink the repo into the target directory so updates
+are picked up without reinstalling; on Windows they fall back to a
+copy if Developer Mode / elevated symlinks aren't available.
+
 ## What it does
 
 Runs a skill against a fixture (a representative task + assertions),

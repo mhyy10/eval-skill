@@ -1,0 +1,27 @@
+{
+  "name": "eval-skill",
+  "version": "0.1.0",
+  "description": "Evaluate and regression-test SKILL.md skills with deterministic asserts and an LLM judge.",
+  "author": {
+    "name": "eval-skill contributors"
+  },
+  "repository": "https://github.com/your-name/eval-skill",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "evaluation",
+    "regression-testing",
+    "llm-judge",
+    "ci"
+  ],
+  "skills": "./",
+  "interface": {
+    "displayName": "eval-skill",
+    "shortDescription": "Score skill quality and catch regressions",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ]
+  }
+}
