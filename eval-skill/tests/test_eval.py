@@ -15,6 +15,130 @@ run_assertions = eval_mod.run_assertions
 extract_json = eval_mod.extract_json
 
 
+def make_skill_dir(tmp: Path, name: str = "my-skill") -> Path:
+    skill = tmp / name
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\n"
+        f"name: {name}\n"
+        "description: test skill\n"
+        "---\n\n"
+        "Do the thing.\n", encoding="utf-8")
+    (skill / "helper.txt").write_text("auxiliary\n", encoding="utf-8")
+    return skill
+
+
+class TestFrontmatterName(unittest.TestCase):
+    def test_reads_name(self):
+        with tempfile.TemporaryDirectory() as td:
+            skill = make_skill_dir(Path(td), "alpha-skill")
+            self.assertEqual(eval_mod.parse_frontmatter_name(skill),
+                             "alpha-skill")
+
+    def test_missing_frontmatter_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            skill = Path(td) / "bare"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text("no frontmatter here\n",
+                                            encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                eval_mod.parse_frontmatter_name(skill)
+
+    def test_missing_name_field_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            skill = Path(td) / "noname"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text(
+                "---\ndescription: only\n---\nbody\n", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                eval_mod.parse_frontmatter_name(skill)
+
+    def test_unclosed_frontmatter_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            skill = Path(td) / "unclosed"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text("---\nname: x\nbody\n",
+                                            encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                eval_mod.parse_frontmatter_name(skill)
+
+
+class TestCodexHome(unittest.TestCase):
+    def test_copies_skill_and_allowlist_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            skill = make_skill_dir(td, "beta")
+            real_home = td / "real-home"
+            real_home.mkdir()
+            (real_home / "auth.json").write_text("{}", encoding="utf-8")
+            (real_home / "config.toml").write_text("x=1\n", encoding="utf-8")
+            (real_home / "history.jsonl").write_text("secret\n",
+                                                     encoding="utf-8")
+            (real_home / "skills").mkdir()
+            (real_home / "skills" / "other-skill").mkdir()
+
+            home, copied = eval_mod.build_codex_home(skill, "beta",
+                                                     real_home)
+            try:
+                self.assertTrue((home / "skills" / "beta" / "SKILL.md")
+                                .exists())
+                self.assertTrue((home / "skills" / "beta" / "helper.txt")
+                                .exists())
+                self.assertTrue((home / "auth.json").exists())
+                self.assertTrue((home / "config.toml").exists())
+                self.assertFalse((home / "history.jsonl").exists())
+                self.assertFalse((home / "skills" / "other-skill").exists())
+                self.assertIn("auth.json", copied)
+                self.assertIn("config.toml", copied)
+            finally:
+                eval_mod.cleanup_codex_home(home)
+            self.assertFalse(home.exists())
+
+    def test_missing_allowlist_files_are_skipped(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = Path(td)
+            skill = make_skill_dir(td, "gamma")
+            real_home = td / "empty-home"
+            real_home.mkdir()
+            home, copied = eval_mod.build_codex_home(skill, "gamma",
+                                                     real_home)
+            try:
+                self.assertTrue((home / "skills" / "gamma").exists())
+                self.assertNotIn("auth.json", copied)
+                self.assertNotIn("config.toml", copied)
+            finally:
+                eval_mod.cleanup_codex_home(home)
+
+
+class TestMountedPrompt(unittest.TestCase):
+    def test_dollar_trigger(self):
+        prompt, mode = eval_mod.build_mounted_task_prompt(
+            "my-skill", "do the task", dollar_supported=True)
+        self.assertEqual(mode, "dollar")
+        self.assertTrue(prompt.startswith("$my-skill\n"))
+        self.assertIn("do the task", prompt)
+
+    def test_fallback_trigger(self):
+        prompt, mode = eval_mod.build_mounted_task_prompt(
+            "my-skill", "do the task", dollar_supported=False)
+        self.assertEqual(mode, "fallback-named")
+        self.assertNotIn("$my-skill", prompt)
+        self.assertIn("`my-skill`", prompt)
+
+    def test_detect_dollar_support_override(self):
+        import os
+        os.environ["EVAL_DOLLAR_SUPPORT"] = "0"
+        try:
+            self.assertFalse(eval_mod.detect_dollar_support("codex"))
+        finally:
+            del os.environ["EVAL_DOLLAR_SUPPORT"]
+        os.environ["EVAL_DOLLAR_SUPPORT"] = "1"
+        try:
+            self.assertTrue(eval_mod.detect_dollar_support("claude"))
+        finally:
+            del os.environ["EVAL_DOLLAR_SUPPORT"]
+
+
 class TestYamlLite(unittest.TestCase):
     def test_scalars(self):
         spec = parse_simple_yaml("name: foo\nruns: 3\nratio: 1.5\nflag: true\n")

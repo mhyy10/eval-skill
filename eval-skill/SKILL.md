@@ -40,6 +40,7 @@ small and pointed at one behavior of the skill.
 
 ```bash
 python scripts/eval.py run --skill <skill-dir> --fixture <fixture-dir> [--cli codex|claude|mock] [--runs N]
+python scripts/eval.py run ... --mount codex   # real skill loading, not prompt injection
 python scripts/eval.py run ... --ci     # asserts only, exit code = gate
 python scripts/report.py                # HTML report at runs/report.html
 python scripts/eval.py init <dir>       # scaffold a new fixture
@@ -50,6 +51,41 @@ fixtures and the pipeline itself before spending real agent tokens.
 If a real CLI cannot start (e.g. `codex.exe` under WindowsApps refuses
 CreateProcess from child processes), fall back to mock and note it in
 the run — a mock run validates plumbing, never skill quality.
+
+## Injection vs. mounting
+
+Default behavior *injects*: `SKILL.md` text is prepended to the task
+prompt. `--mount codex` *mounts* instead: the skill is copied into a
+temporary `CODEX_HOME/skills/<name>/`, the agent launches with that
+`CODEX_HOME`, and the prompt triggers the skill via `$name`.
+
+Choose deliberately — they measure different things:
+
+- **Inject** when iterating on skill *content*. Fast, no CLI quirks,
+  and "does the model follow these instructions" is usually what you
+  are editing.
+- **Mount** when validating a skill *before shipping*. It catches
+  failure modes injection cannot: broken frontmatter, auxiliary files
+  the skill expects, and (with real CLI) whether the platform's loader
+  accepts the skill at all.
+
+Mount rules of thumb:
+
+- The skill's canonical name comes from frontmatter `name:`, not the
+  directory. Missing `name:` aborts the run — fix the skill, don't
+  work around it.
+- Mount failures abort the whole run. A mount error is never recorded
+  as a skill-quality failure, because the skill never got to run.
+- Use `--cli mock --mount codex` to validate the mount path itself on
+  machines where a real `codex` CLI cannot start. It exercises
+  frontmatter parsing, `CODEX_HOME` construction, and cleanup without
+  an agent.
+- The temporary `CODEX_HOME` is always deleted, even under
+  `--keep-workdirs` — it contains `auth.json`. Never point `--mount`
+  at a `CODEX_HOME` you cannot afford to see copied temporarily.
+- If `codex exec` does not expand `$name` in your environment, set
+  `EVAL_DOLLAR_SUPPORT=0`; the prompt falls back to a named-skill
+  instruction and the trace records `trigger_mode: fallback-named`.
 
 ## Regression discipline
 

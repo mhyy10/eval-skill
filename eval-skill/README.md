@@ -50,10 +50,62 @@ checks the output in two layers, and renders an HTML report:
 2. **LLM judge** — an agent grades quality against a rubric (JSON score).
    This is a trend signal, never a CI gate.
 
+## Injection vs. mounting
+
+By default the runner *injects* the skill: `SKILL.md`'s full text is
+prepended to the task prompt. That measures "what the model does after
+reading the skill" but not "what happens when the platform loads the
+skill through its real mechanism." Those can diverge — a skill that
+reads fine as a prompt may never be routed to, or may reference
+auxiliary files the injection path silently misses.
+
+`--mount codex` switches to *mounting*: the skill directory is copied
+into a temporary `CODEX_HOME/skills/<name>/`, the agent is launched
+with `CODEX_HOME` pointing there, and the task prompt triggers the
+skill via `$name`. This measures the skill as the platform actually
+loads it.
+
+Key properties of the mount implementation:
+
+- **Isolation.** The temporary `CODEX_HOME` contains only the mounted
+  skill plus an allowlist (`auth.json`, `config.toml`) needed for the
+  CLI to start. Your other skills, memories, history, and sqlite state
+  are not inherited, so the mounted skill is the only one the agent can
+  route to.
+- **Credential hygiene.** The temporary home is deleted after every
+  attempt, even on failure and even with `--keep-workdirs` (which keeps
+  the *workdir*, never the home, because `auth.json` holds tokens).
+- **Canonical naming.** The skill name for `$name` is read from
+  `SKILL.md`'s frontmatter `name:` field, not the directory name. If
+  frontmatter or `name:` is missing, the run aborts before any attempt
+  — a mount problem is a framework/environment error, never a skill-
+  quality signal.
+- **`$name` fallback.** Whether `codex exec` expands `$name` in non-
+  interactive mode is auto-detected (override with
+  `EVAL_DOLLAR_SUPPORT=0|1`). If unsupported, the prompt falls back to
+  an explicit "use the skill named `X`" instruction, and the trace
+  records `trigger_mode: fallback-named` so reports can flag the
+  downgrade.
+
+Valid combinations: `--cli codex --mount codex` (real mounted run),
+`--cli mock --mount codex` (validates mount/cleanup logic without a
+live agent). `--mount claude` is rejected: Claude Code has no per-run
+skills-root override, so mounting would mean writing into your real
+`~/.claude/skills` — a separate, riskier feature that is not
+implemented.
+
+Current verification status: mount/cleanup/frontmatter/fallback logic
+is covered by unit tests and by `--cli mock` end-to-end runs. A real
+`codex exec` end-to-end mounted run has not yet been performed on this
+machine (the WindowsApps-bundled `codex.exe` cannot be spawned from a
+child process); that verification is a known TODO, to be done on a
+machine with a conventionally-installed codex CLI.
+
 ## Commands
 
 ```bash
 python scripts/eval.py run --skill <skill-dir> --fixture <fixture-dir> [--cli codex|claude|mock] [--runs N] [--keep-workdirs]
+python scripts/eval.py run ... --mount codex   # load skill via CODEX_HOME, not prompt injection
 python scripts/eval.py run ... --ci     # asserts only; exit 1 if any fail
 python scripts/report.py                # writes runs/report.html
 python scripts/eval.py init <dir>       # scaffold a new fixture
