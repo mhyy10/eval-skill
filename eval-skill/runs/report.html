@@ -4,12 +4,21 @@
   body { font: 14px/1.5 -apple-system, "Segoe UI", sans-serif;
          margin: 2rem auto; max-width: 900px; color: #1a1a1a; }
   h1 { font-size: 1.4rem; }
+  .group { margin-bottom: 2.5rem; }
+  .group-title { font-size: 1.05rem; border-bottom: 1px solid #ddd;
+                  padding-bottom: .3rem; }
+  .trend { margin: .5rem 0 1rem 0; }
+  .trend-title { font-size: .8rem; color: #666; margin-top: .4rem; }
+  .trend-placeholder { border: 1px dashed #ccc; color: #888;
+                         padding: .6rem .8rem; font-size: .85rem;
+                         border-radius: 6px; margin: .5rem 0 1rem 0; }
   .card { border: 1px solid #ddd; border-left: 4px solid #999;
           border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }
   .card.pass { border-left-color: #2e9e5b; }
   .card.fail { border-left-color: #d64545; }
   .meta { color: #555; margin-bottom: .5rem; }
   .delta { font-size: .85rem; color: #775500; margin-bottom: .5rem; }
+  .nav { font-size: .9rem; }
   table { border-collapse: collapse; width: 100%; }
   td, th { border: 1px solid #eee; padding: .3rem .5rem; text-align: left; }
   tr.fail td { background: #fdecec; }
@@ -19,37 +28,8 @@
   code { background: #f4f4f4; padding: 0 .3em; border-radius: 3px; }
 </style></head><body>
 <h1>eval-skill report &middot; 9 run(s)</h1>
-
-<section class="card pass">
-  <h2>20260804-183103-edit-article-clarity</h2>
-  <div class="meta">
-    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
-    cli <code>mock</code> &middot;
-    judge <code>claude</code> &middot; 
-    pass-rate <b>100%</b> &middot;
-    judge avg <b>-</b>
-  </div>
-  <div class='delta'>vs baseline 20260804-182735-edit-article-clarity: pass-rate +0.00</div>
-  <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='fail'><td>0</td><td>3/3</td><td>-</td><td class='judge-error'>judge CLI &#x27;claude&#x27; exited -1: CLI not found on PATH: claude</td></tr>
-  </table>
-</section>
-<section class="card pass">
-  <h2>20260804-182735-edit-article-clarity</h2>
-  <div class="meta">
-    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
-    cli <code>mock</code> &middot;
-    judge <code>mock</code> &middot; 
-    pass-rate <b>100%</b> &middot;
-    judge avg <b>4.00</b>
-  </div>
-  <div class='delta'>vs baseline 20260804-182646-edit-article-clarity: pass-rate +0.00</div>
-  <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
-  </table>
-</section>
+<ul class="nav"><li><a href='#g0'>edit-article-clarity / agent=mock</a> (4 run(s))</li><li><a href='#g1'>edit-article-clarity / agent=mock / mount=codex</a> (2 run(s))</li><li><a href='#g2'>edit-article-clarity / agent=mock / judge=mock</a> (2 run(s))</li><li><a href='#g3'>edit-article-clarity / agent=mock / judge=claude</a> (1 run(s))</li></ul>
+<section class='group' id='g0'><h2 class='group-title'>edit-article-clarity / agent=mock</h2><div class='trend'><div class='trend-title'>assert pass-rate</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>0%</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>50%</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>100%</text><circle cx='34.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260731-164418-edit-article-clarity: 100%</title></circle><line x1='34.0' y1='8.0' x2='259.3' y2='92.0' stroke='#2e9e5b' stroke-width='1.5'/><circle cx='259.3' cy='92.0' r='3.5' fill='#2e9e5b'><title>20260731-164529-edit-article-clarity: 0%</title></circle><line x1='259.3' y1='92.0' x2='484.7' y2='8.0' stroke='#2e9e5b' stroke-width='1.5'/><circle cx='484.7' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-143438-edit-article-clarity: 100%</title></circle><line x1='484.7' y1='8.0' x2='710.0' y2='8.0' stroke='#2e9e5b' stroke-width='1.5'/><circle cx='710.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-182646-edit-article-clarity: 100%</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260731-1644</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1826</text></svg><div class='trend-title'>judge avg</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>1.0</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>3.0</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>5.0</text><circle cx='34.0' cy='29.0' r='3.5' fill='#3a6ea5'><title>20260731-164418-edit-article-clarity: 4.0</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260731-1644</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1826</text></svg></div>
 <section class="card pass">
   <h2>20260804-182646-edit-article-clarity</h2>
   <div class="meta">
@@ -59,25 +39,10 @@
     pass-rate <b>100%</b> &middot;
     judge avg <b>-</b>
   </div>
-  <div class='delta'>vs baseline 20260804-182404-edit-article-clarity: pass-rate +0.00</div>
-  <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
-  </table>
-</section>
-<section class="card pass">
-  <h2>20260804-182404-edit-article-clarity</h2>
-  <div class="meta">
-    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
-    cli <code>mock</code> &middot;
-    judge <code>mock</code> &middot; 
-    pass-rate <b>100%</b> &middot;
-    judge avg <b>4.00</b>
-  </div>
   <div class='delta'>vs baseline 20260804-143438-edit-article-clarity: pass-rate +0.00</div>
   <table>
     <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
   </table>
 </section>
 <section class="card pass">
@@ -89,40 +54,10 @@
     pass-rate <b>100%</b> &middot;
     judge avg <b>-</b>
   </div>
-  <div class='delta'>vs baseline 20260804-143138-edit-article-clarity: pass-rate +0.00</div>
-  <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
-  </table>
-</section>
-<section class="card pass">
-  <h2>20260804-143138-edit-article-clarity</h2>
-  <div class="meta">
-    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
-    cli <code>mock</code> &middot;
-    
-    pass-rate <b>100%</b> &middot;
-    judge avg <b>-</b>
-  </div>
-  <div class='delta'>vs baseline 20260804-142752-edit-article-clarity: pass-rate +0.00</div>
-  <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
-  </table>
-</section>
-<section class="card pass">
-  <h2>20260804-142752-edit-article-clarity</h2>
-  <div class="meta">
-    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
-    cli <code>mock</code> &middot;
-    
-    pass-rate <b>100%</b> &middot;
-    judge avg <b>4.00</b>
-  </div>
   <div class='delta'>vs baseline 20260731-164529-edit-article-clarity: pass-rate +1.00</div>
   <table>
     <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
-    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
   </table>
 </section>
 <section class="card fail">
@@ -154,5 +89,80 @@
     <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
     <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>2</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
   </table>
+</section></section><section class='group' id='g1'><h2 class='group-title'>edit-article-clarity / agent=mock / mount=codex</h2><div class='trend'><div class='trend-title'>assert pass-rate</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>0%</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>50%</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>100%</text><circle cx='34.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-142752-edit-article-clarity: 100%</title></circle><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#2e9e5b' stroke-width='1.5'/><circle cx='710.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-143138-edit-article-clarity: 100%</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260804-1427</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1431</text></svg><div class='trend-title'>judge avg</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>1.0</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>3.0</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>5.0</text><circle cx='34.0' cy='29.0' r='3.5' fill='#3a6ea5'><title>20260804-142752-edit-article-clarity: 4.0</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260804-1427</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1431</text></svg></div>
+<section class="card pass">
+  <h2>20260804-143138-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-142752-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
+  </table>
 </section>
+<section class="card pass">
+  <h2>20260804-142752-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section></section><section class='group' id='g2'><h2 class='group-title'>edit-article-clarity / agent=mock / judge=mock</h2><div class='trend'><div class='trend-title'>assert pass-rate</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>0%</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>50%</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>100%</text><circle cx='34.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-182404-edit-article-clarity: 100%</title></circle><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#2e9e5b' stroke-width='1.5'/><circle cx='710.0' cy='8.0' r='3.5' fill='#2e9e5b'><title>20260804-182735-edit-article-clarity: 100%</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260804-1824</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1827</text></svg><div class='trend-title'>judge avg</div><svg width='720' height='110' viewBox='0 0 720 110' xmlns='http://www.w3.org/2000/svg' role='img'><line x1='34.0' y1='92.0' x2='710.0' y2='92.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='95.0' font-size='9' fill='#666' text-anchor='end'>1.0</text><line x1='34.0' y1='50.0' x2='710.0' y2='50.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='53.0' font-size='9' fill='#666' text-anchor='end'>3.0</text><line x1='34.0' y1='8.0' x2='710.0' y2='8.0' stroke='#eee' stroke-width='1.5'/><text x='30.0' y='11.0' font-size='9' fill='#666' text-anchor='end'>5.0</text><circle cx='34.0' cy='29.0' r='3.5' fill='#3a6ea5'><title>20260804-182404-edit-article-clarity: 4.0</title></circle><line x1='34.0' y1='29.0' x2='710.0' y2='29.0' stroke='#3a6ea5' stroke-width='1.5'/><circle cx='710.0' cy='29.0' r='3.5' fill='#3a6ea5'><title>20260804-182735-edit-article-clarity: 4.0</title></circle><text x='34.0' y='106.0' font-size='9' fill='#666' text-anchor='start'>20260804-1824</text><text x='710.0' y='106.0' font-size='9' fill='#666' text-anchor='end'>20260804-1827</text></svg></div>
+<section class="card pass">
+  <h2>20260804-182735-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>mock</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-182404-edit-article-clarity: pass-rate +0.00, judge +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-182404-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>mock</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section></section><section class='group' id='g3'><h2 class='group-title'>edit-article-clarity / agent=mock / judge=claude</h2><div class='trend-placeholder'>需要 &ge;2 个同配置 run 才能显示趋势；当前该组只有 1 个 run。</div>
+<section class="card pass">
+  <h2>20260804-183103-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>claude</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='fail'><td>0</td><td>3/3</td><td>-</td><td class='judge-error'>judge CLI &#x27;claude&#x27; exited -1: CLI not found on PATH: claude</td></tr>
+  </table>
+</section></section>
 </body></html>

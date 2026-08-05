@@ -31,51 +31,199 @@ def row_class(ok):
     return "pass" if ok else "fail"
 
 
+# ---------------------------------------------------------------- grouping
+
+def group_key(run) -> tuple:
+    """Runs trend together only when agent, mount, judge, and fixture
+    all match; otherwise a score change may reflect a config change
+    rather than a skill change."""
+    return (
+        run["fixture"],
+        run["cli"],
+        run.get("mount"),
+        run.get("judge_cli"),
+    )
+
+
+def group_label(key) -> str:
+    fixture, cli, mount, judge_cli = key
+    parts = [fixture, f"agent={cli}"]
+    if mount:
+        parts.append(f"mount={mount}")
+    if judge_cli:
+        parts.append(f"judge={judge_cli}")
+    return " / ".join(parts)
+
+
+def group_runs(runs) -> dict:
+    groups: dict = {}
+    for run in runs:
+        groups.setdefault(group_key(run), []).append(run)
+    return groups
+
+
+# ---------------------------------------------------------------- svg trend
+
+SVG_W = 720
+SVG_H = 110
+SVG_PAD_L = 34
+SVG_PAD_R = 10
+SVG_PAD_T = 8
+SVG_PAD_B = 18
+
+
+def _svg_line(x1, y1, x2, y2, color):
+    return (f"<line x1='{x1:.1f}' y1='{y1:.1f}' x2='{x2:.1f}' y2='{y2:.1f}'"
+            f" stroke='{color}' stroke-width='1.5'/>")
+
+
+def _svg_dot(cx, cy, color, title):
+    return (f"<circle cx='{cx:.1f}' cy='{cy:.1f}' r='3.5' fill='{color}'>"
+            f"<title>{html.escape(title)}</title></circle>")
+
+
+def _svg_text(x, y, text, anchor="end", size=9, color="#666"):
+    return (f"<text x='{x:.1f}' y='{y:.1f}' font-size='{size}' "
+            f"fill='{color}' text-anchor='{anchor}'>"
+            f"{html.escape(text)}</text>")
+
+
+def render_series(points, y_min, y_max, color, value_fmt) -> str:
+    """One trend line. `points` is a list of (run_id, value|None);
+    None values break the line (e.g. ci-mode runs have no judge)."""
+    n = len(points)
+    plot_w = SVG_W - SVG_PAD_L - SVG_PAD_R
+    plot_h = SVG_H - SVG_PAD_T - SVG_PAD_B
+    span = max(1e-9, y_max - y_min)
+
+    def x_of(i):
+        return SVG_PAD_L + (plot_w * i / max(1, n - 1))
+
+    def y_of(v):
+        return SVG_PAD_T + plot_h * (1 - (v - y_min) / span)
+
+    parts = []
+    for frac in (0, 0.5, 1):
+        yv = y_min + span * frac
+        y = y_of(yv)
+        parts.append(_svg_line(SVG_PAD_L, y, SVG_W - SVG_PAD_R, y, "#eee"))
+        parts.append(_svg_text(SVG_PAD_L - 4, y + 3, value_fmt(yv)))
+    prev = None
+    for i, (run_id, value) in enumerate(points):
+        if value is None:
+            prev = None
+            continue
+        x, y = x_of(i), y_of(value)
+        if prev is not None:
+            parts.append(_svg_line(prev[0], prev[1], x, y, color))
+        parts.append(_svg_dot(x, y, color, f"{run_id}: {value_fmt(value)}"))
+        prev = (x, y)
+    if n >= 1:
+        parts.append(_svg_text(SVG_PAD_L, SVG_H - 4,
+                               points[0][0][:13], anchor="start"))
+        if n > 1:
+            parts.append(_svg_text(SVG_W - SVG_PAD_R, SVG_H - 4,
+                                   points[-1][0][:13], anchor="end"))
+    return (f"<svg width='{SVG_W}' height='{SVG_H}' "
+            f"viewBox='0 0 {SVG_W} {SVG_H}' "
+            f"xmlns='http://www.w3.org/2000/svg' role='img'>"
+            + "".join(parts) + "</svg>")
+
+
+def render_trend(group_runs_list) -> str:
+    """Dual-subplot trend for one group: assert pass-rate on top,
+    judge average below. Groups with fewer than two runs get a
+    placeholder explaining why no trend is shown."""
+    runs = sorted(group_runs_list, key=lambda r: r["run_id"])
+    if len(runs) < 2:
+        return ("<div class='trend-placeholder'>"
+                "需要 &ge;2 个同配置 run 才能显示趋势；"
+                "当前该组只有 " + str(len(runs)) + " 个 run。"
+                "</div>")
+    pr_points = [(r["run_id"], r["asserts_pass_rate"]) for r in runs]
+    judge_points = [
+        (r["run_id"], avg(r.get("judge_scores") or [])) for r in runs]
+    top = render_series(pr_points, 0, 1, "#2e9e5b",
+                        lambda v: f"{v * 100:.0f}%")
+    bottom = render_series(judge_points, 1, 5, "#3a6ea5",
+                           lambda v: f"{v:.1f}")
+    return (f"<div class='trend'>"
+            f"<div class='trend-title'>assert pass-rate</div>{top}"
+            f"<div class='trend-title'>judge avg</div>{bottom}"
+            f"</div>")
+
+
+# ---------------------------------------------------------------- render
+
 def render(runs) -> str:
-    cards = []
-    for i, run in enumerate(reversed(runs)):
-        attempts = run["attempts"]
-        pass_rate = run["asserts_pass_rate"]
-        judge_scores = run.get("judge_scores") or []
-        judge_avg = avg(judge_scores)
+    groups = group_runs(runs)
+    order: list = []
+    for run in runs:
+        k = group_key(run)
+        if k not in order:
+            order.append(k)
 
-        baseline_html = ""
-        prev_idx = len(runs) - i - 2
-        if prev_idx >= 0:
-            prev = runs[prev_idx]
-            d_pr = pass_rate - prev["asserts_pass_rate"]
-            prev_judge = avg(prev.get("judge_scores") or [])
-            d_judge = (judge_avg - prev_judge) if (
-                judge_avg is not None and prev_judge is not None) else None
-            baseline_html = (
-                f"<div class='delta'>vs baseline {html.escape(prev['run_id'])}: "
-                f"pass-rate {'+' if d_pr >= 0 else ''}{fmt(d_pr)}"
-                + (f", judge {'+' if d_judge >= 0 else ''}{fmt(d_judge)}"
-                   if d_judge is not None else "")
-                + "</div>"
-            )
+    nav = "".join(
+        f"<li><a href='#g{i}'>{html.escape(group_label(k))}</a>"
+        f" ({len(groups[k])} run(s))</li>"
+        for i, k in enumerate(order))
 
-        rows = "".join(
-            "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td><td%s>%s</td></tr>" % (
-                row_class(a["asserts_passed"] == a["asserts_total"]
-                          and not a.get("judge_error")),
-                a["index"], a["asserts_passed"], a["asserts_total"],
-                fmt((a["judge"] or {}).get("total")) if a["judge"] else "-",
-                " class='judge-error'" if a.get("judge_error") else "",
-                (html.escape(a["judge_error"][:120]) if a.get("judge_error")
-                 else html.escape(((a["judge"] or {}).get("notes", "")[:120]))
-                 if a["judge"] else ""),
+    sections = []
+    for gi, key in enumerate(order):
+        g_runs = groups[key]
+        trend_html = render_trend(g_runs)
+        cards = []
+        for i, run in enumerate(reversed(g_runs)):
+            attempts = run["attempts"]
+            pass_rate = run["asserts_pass_rate"]
+            judge_scores = run.get("judge_scores") or []
+            judge_avg = avg(judge_scores)
+
+            baseline_html = ""
+            prev_idx = len(g_runs) - i - 2
+            if prev_idx >= 0:
+                prev = g_runs[prev_idx]
+                d_pr = pass_rate - prev["asserts_pass_rate"]
+                prev_judge = avg(prev.get("judge_scores") or [])
+                d_judge = (judge_avg - prev_judge) if (
+                    judge_avg is not None and prev_judge is not None
+                ) else None
+                baseline_html = (
+                    f"<div class='delta'>vs baseline "
+                    f"{html.escape(prev['run_id'])}: "
+                    f"pass-rate {'+' if d_pr >= 0 else ''}{fmt(d_pr)}"
+                    + (f", judge {'+' if d_judge >= 0 else ''}"
+                       f"{fmt(d_judge)}" if d_judge is not None else "")
+                    + "</div>"
+                )
+
+            rows = "".join(
+                "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td>"
+                "<td%s>%s</td></tr>" % (
+                    row_class(a["asserts_passed"] == a["asserts_total"]
+                              and not a.get("judge_error")),
+                    a["index"], a["asserts_passed"], a["asserts_total"],
+                    fmt((a["judge"] or {}).get("total"))
+                    if a["judge"] else "-",
+                    " class='judge-error'"
+                    if a.get("judge_error") else "",
+                    (html.escape(a["judge_error"][:120])
+                     if a.get("judge_error")
+                     else html.escape(
+                         ((a["judge"] or {}).get("notes", "")[:120]))
+                     if a["judge"] else ""),
+                )
+                for a in attempts
             )
-            for a in attempts
-        )
-        judge_cli = run.get("judge_cli")
-        cards.append(f"""
+            judge_cli = run.get("judge_cli")
+            cards.append(f"""
 <section class="card {'pass' if pass_rate == 1.0 else 'fail'}">
   <h2>{html.escape(run['run_id'])}</h2>
   <div class="meta">
     skill <code>{html.escape(run['skill'])}</code> &middot;
     cli <code>{html.escape(run['cli'])}</code> &middot;
-    {(f"judge <code>{html.escape(judge_cli)}</code> &middot; " if judge_cli else "")}
+    {(f"judge <code>{html.escape(judge_cli)}</code> &middot; "
+      if judge_cli else "")}
     pass-rate <b>{fmt(pass_rate * 100, 0)}%</b> &middot;
     judge avg <b>{fmt(judge_avg)}</b>
   </div>
@@ -85,6 +233,10 @@ def render(runs) -> str:
     {rows}
   </table>
 </section>""")
+        sections.append(
+            f"<section class='group' id='g{gi}'>"
+            f"<h2 class='group-title'>{html.escape(group_label(key))}</h2>"
+            f"{trend_html}{''.join(cards)}</section>")
 
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>eval-skill report</title>
@@ -92,12 +244,21 @@ def render(runs) -> str:
   body {{ font: 14px/1.5 -apple-system, "Segoe UI", sans-serif;
          margin: 2rem auto; max-width: 900px; color: #1a1a1a; }}
   h1 {{ font-size: 1.4rem; }}
+  .group {{ margin-bottom: 2.5rem; }}
+  .group-title {{ font-size: 1.05rem; border-bottom: 1px solid #ddd;
+                  padding-bottom: .3rem; }}
+  .trend {{ margin: .5rem 0 1rem 0; }}
+  .trend-title {{ font-size: .8rem; color: #666; margin-top: .4rem; }}
+  .trend-placeholder {{ border: 1px dashed #ccc; color: #888;
+                         padding: .6rem .8rem; font-size: .85rem;
+                         border-radius: 6px; margin: .5rem 0 1rem 0; }}
   .card {{ border: 1px solid #ddd; border-left: 4px solid #999;
           border-radius: 6px; padding: 1rem 1.25rem; margin: 1rem 0; }}
   .card.pass {{ border-left-color: #2e9e5b; }}
   .card.fail {{ border-left-color: #d64545; }}
   .meta {{ color: #555; margin-bottom: .5rem; }}
   .delta {{ font-size: .85rem; color: #775500; margin-bottom: .5rem; }}
+  .nav {{ font-size: .9rem; }}
   table {{ border-collapse: collapse; width: 100%; }}
   td, th {{ border: 1px solid #eee; padding: .3rem .5rem; text-align: left; }}
   tr.fail td {{ background: #fdecec; }}
@@ -107,7 +268,8 @@ def render(runs) -> str:
   code {{ background: #f4f4f4; padding: 0 .3em; border-radius: 3px; }}
 </style></head><body>
 <h1>eval-skill report &middot; {len(runs)} run(s)</h1>
-{''.join(cards)}
+<ul class="nav">{nav}</ul>
+{''.join(sections)}
 </body></html>"""
 
 
