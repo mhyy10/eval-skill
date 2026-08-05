@@ -10,3 +10,6 @@ Score the edited article in `output/edited.md` against the original
 
 Return JSON only: {"structure": N, "clarity": N, "fidelity": N,
 "total": N, "notes": "one paragraph"}.
+
+The "total" is your overall score on a 1-5 scale (not the sum of
+axes). Weigh all three axes; fidelity matters most.

@@ -336,15 +336,44 @@ def resolve_judge_cli(args_judge_cli: str | None,
     return args_judge_cli or fixture_judge_cli or agent_cli
 
 
-def agent_cmd(cli: str, prompt: str, workdir: Path) -> list[str]:
-    if cli == "codex":
-        return [
-            "codex", "exec", "--skip-git-repo-check",
-            "--sandbox", "workspace-write", "-C", str(workdir), prompt,
-        ]
-    if cli == "claude":
-        return ["claude", "-p", prompt, "--dangerously-skip-permissions"]
-    raise SystemExit(f"unknown CLI: {cli}")
+def resolve_codex_bin() -> str:
+    """Find a codex binary that actually launches.
+
+    EVAL_CODEX_BIN env var wins. Otherwise probe every `codex` on PATH
+    via where.exe, preferring npm-installed versions (which can spawn
+    from child processes) over WindowsApps/desktop-app versions (which
+    cannot).
+    """
+    if override := os.environ.get("EVAL_CODEX_BIN"):
+        return override
+    try:
+        out = subprocess.run(
+            ["where.exe", "codex"], capture_output=True, text=True,
+            timeout=5,
+        )
+        candidates = [ln.strip() for ln in out.stdout.splitlines()
+                      if ln.strip()]
+    except FileNotFoundError:
+        candidates = []
+    if not candidates:
+        # where.exe missed it; fall back to shutil.which
+        if p := shutil.which("codex"):
+            candidates = [p]
+    # Prefer npm-installed binaries: they live outside WindowsApps and
+    # can be spawned from child processes.
+    npm_hint = os.path.join(os.environ.get("APPDATA", ""), "npm")
+    candidates.sort(key=lambda p: 0 if npm_hint in p else 1)
+    for path in candidates:
+        try:
+            subprocess.run(
+                [path, "--version"], capture_output=True, timeout=10,
+            )
+            return path
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    raise SystemExit(
+        "no working codex binary found on PATH; "
+        "set EVAL_CODEX_BIN to a codex that can start")
 
 
 def run_mock_agent(prompt: str, workdir: Path) -> dict:
@@ -389,14 +418,33 @@ def invoke_agent(cli: str, prompt: str, workdir: Path,
                  codex_home: Path | None = None) -> dict:
     if cli == "mock":
         return run_mock_agent(prompt, workdir)
-    cmd = agent_cmd(cli, prompt, workdir)
+
     env = None
     if codex_home is not None:
         env = dict(os.environ)
         env["CODEX_HOME"] = str(codex_home)
+
+    if cli == "codex":
+        codex_bin = resolve_codex_bin()
+        cmd = [
+            codex_bin, "exec", "--skip-git-repo-check",
+            "--sandbox", "workspace-write",
+            "-c", "approval=never",
+            "-C", str(workdir),
+            "-",  # read prompt from stdin
+        ]
+        stdin_data = prompt
+    elif cli == "claude":
+        cmd = ["claude", "-p", prompt, "--dangerously-skip-permissions"]
+        stdin_data = None
+    else:
+        raise SystemExit(f"unknown CLI: {cli}")
+
     try:
         proc = subprocess.run(
             cmd, cwd=workdir, capture_output=True, text=True,
+            encoding="utf-8",
+            input=stdin_data,
             env=env,
             timeout=int(os.environ.get("EVAL_AGENT_TIMEOUT", "900")),
         )
