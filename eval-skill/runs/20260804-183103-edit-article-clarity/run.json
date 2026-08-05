@@ -1,0 +1,41 @@
+{
+  "run_id": "20260804-183103-edit-article-clarity",
+  "fixture": "edit-article-clarity",
+  "skill": "C:\\Users\\15479\\.codex\\skills\\edit-article",
+  "cli": "mock",
+  "mount": null,
+  "judge_cli": "claude",
+  "ci_mode": false,
+  "timestamp": "20260804-183103",
+  "attempts": [
+    {
+      "index": 0,
+      "agent_exit": 0,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": true,
+          "detail": "output/edited.md found"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": true,
+          "detail": "2 pattern(s) ok"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": true,
+          "detail": "15 lines (need >= 10)"
+        }
+      ],
+      "asserts_passed": 3,
+      "asserts_total": 3,
+      "judge": null,
+      "judge_error": "judge CLI 'claude' exited -1: CLI not found on PATH: claude",
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-0-xrpw4_45",
+      "trace": "attempt-0.trace.json.gz"
+    }
+  ],
+  "asserts_pass_rate": 1.0,
+  "judge_scores": []
+}

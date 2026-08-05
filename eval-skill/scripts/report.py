@@ -56,21 +56,26 @@ def render(runs) -> str:
             )
 
         rows = "".join(
-            "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td><td>%s</td></tr>" % (
-                row_class(a["asserts_passed"] == a["asserts_total"]),
+            "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td><td%s>%s</td></tr>" % (
+                row_class(a["asserts_passed"] == a["asserts_total"]
+                          and not a.get("judge_error")),
                 a["index"], a["asserts_passed"], a["asserts_total"],
                 fmt((a["judge"] or {}).get("total")) if a["judge"] else "-",
-                html.escape(((a["judge"] or {}).get("notes", "")[:120]))
-                if a["judge"] else "",
+                " class='judge-error'" if a.get("judge_error") else "",
+                (html.escape(a["judge_error"][:120]) if a.get("judge_error")
+                 else html.escape(((a["judge"] or {}).get("notes", "")[:120]))
+                 if a["judge"] else ""),
             )
             for a in attempts
         )
+        judge_cli = run.get("judge_cli")
         cards.append(f"""
 <section class="card {'pass' if pass_rate == 1.0 else 'fail'}">
   <h2>{html.escape(run['run_id'])}</h2>
   <div class="meta">
     skill <code>{html.escape(run['skill'])}</code> &middot;
     cli <code>{html.escape(run['cli'])}</code> &middot;
+    {(f"judge <code>{html.escape(judge_cli)}</code> &middot; " if judge_cli else "")}
     pass-rate <b>{fmt(pass_rate * 100, 0)}%</b> &middot;
     judge avg <b>{fmt(judge_avg)}</b>
   </div>
@@ -97,6 +102,8 @@ def render(runs) -> str:
   td, th {{ border: 1px solid #eee; padding: .3rem .5rem; text-align: left; }}
   tr.fail td {{ background: #fdecec; }}
   tr.pass td {{ background: #eefaf2; }}
+  td.judge-error {{ background: #fff3cd; color: #7a5c00;
+                    font-family: monospace; font-size: .85em; }}
   code {{ background: #f4f4f4; padding: 0 .3em; border-radius: 3px; }}
 </style></head><body>
 <h1>eval-skill report &middot; {len(runs)} run(s)</h1>

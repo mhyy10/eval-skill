@@ -20,6 +20,41 @@ Always separate these — mixing them is the most common eval mistake.
    written rubric. Judge scores drift run-to-run; treat them as a trend
    signal in reports, never as a CI gate.
 
+## Choosing a judge
+
+Default judge = the same agent that did the task, grading itself. That
+is fine for a quick smoke signal but systematically biased: agents
+overrate their own work and anchor on the choices they already made.
+
+Use `--judge-cli <other>` when the score actually matters — before
+shipping a skill, or when trending over time. A different CLI judges
+the work cold, with no memory of doing it.
+
+Whatever judge you use, declare its inputs in `fixture.yaml`:
+
+```yaml
+judge:
+  rubric: rubric.md
+  inputs:
+    - path: output/edited.md
+      label: edited
+    - path: input/draft.md
+      label: original
+```
+
+Injected inputs are the judge's contract: they say exactly which files
+the grade is about. A declared input that goes missing aborts the run
+on purpose — a stale contract producing confident-looking scores is
+worse than no score.
+
+Rubrics for external judges must be self-contained: the judge did not
+do the task, so "did you preserve the draft's claims" works, "did you
+follow the steps you planned" does not.
+
+Judge failures never fail CI. A `judge_error` in `run.json` means the
+judge could not score (missing CLI, bad output); asserts still gate.
+Investigate `judge_error` before trusting a run's trend line.
+
 ## Writing fixtures
 
 One fixture = one representative task + its assertions. Keep fixtures

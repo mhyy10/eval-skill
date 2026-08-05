@@ -17,4 +17,9 @@ assert:
 judge:
   rubric: rubric.md
   max_score: 5
+  inputs:
+    - path: output/edited.md
+      label: edited
+    - path: input/draft.md
+      label: original
 runs: 3

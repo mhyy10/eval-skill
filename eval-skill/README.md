@@ -101,11 +101,72 @@ machine (the WindowsApps-bundled `codex.exe` cannot be spawned from a
 child process); that verification is a known TODO, to be done on a
 machine with a conventionally-installed codex CLI.
 
+## External judge
+
+By default the judge is the same agent that just completed the task,
+grading its own work. That couples the score to the agent's self-
+assessment biases. `--judge-cli` decouples it: the judge becomes a
+separate process (potentially a different CLI) that receives the
+declared outputs explicitly.
+
+```bash
+python scripts/eval.py run ... --judge-cli claude   # judge on a different CLI
+```
+
+Judge CLI resolution order: `--judge-cli` > the fixture's `judge.cli`
+> `--cli` (the agent under test). The actual judge used is recorded in
+`run.json` as `judge_cli`.
+
+### Declaring judge inputs
+
+With an external judge, "grade your own just-completed work" no longer
+makes sense — the judge did not do the task. Declare the files the
+judge should grade in `fixture.yaml`:
+
+```yaml
+judge:
+  rubric: rubric.md
+  max_score: 5
+  inputs:
+    - path: output/edited.md
+      label: edited
+    - path: input/draft.md
+      label: original
+```
+
+The runner injects each as `<file label="..." path="...">...</file>`
+in the judge prompt. A declared input that does not exist aborts the
+run — judge inputs are part of the evaluation contract, and silently
+skipping one would keep producing misleading scores. Files larger than
+32 KB are truncated with a marker; raise the cap with
+`judge.max_input_bytes` if a fixture genuinely needs bigger inputs.
+
+Fixtures without `judge.inputs` still work: the judge prompt contains
+only the rubric, and the trace records `judge_inputs: none` so reports
+can distinguish injected from non-injected scoring.
+
+### Judge failures
+
+A judge that fails (CLI not found, non-zero exit, no JSON in stdout)
+does NOT fail the run — judge scores are a trend signal, never a CI
+gate. The failure is recorded per-attempt as `judge_error` in
+`run.json`, printed as `JUDGE-ERROR` in the run log, and shown in the
+HTML report, so a misconfigured `--judge-cli` is visible rather than
+silently producing score-free runs.
+
+### Known gap: judge model
+
+There is currently no `--judge-model`. The judge uses whatever model
+its CLI is configured with. Model-level judge control is deliberately
+deferred until there is enough judge-score data to choose a judge
+model on evidence rather than vibes.
+
 ## Commands
 
 ```bash
 python scripts/eval.py run --skill <skill-dir> --fixture <fixture-dir> [--cli codex|claude|mock] [--runs N] [--keep-workdirs]
 python scripts/eval.py run ... --mount codex   # load skill via CODEX_HOME, not prompt injection
+python scripts/eval.py run ... --judge-cli X   # judge on CLI X, not the agent under test
 python scripts/eval.py run ... --ci     # asserts only; exit 1 if any fail
 python scripts/report.py                # writes runs/report.html
 python scripts/eval.py init <dir>       # scaffold a new fixture

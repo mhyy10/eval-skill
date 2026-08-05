@@ -31,6 +31,11 @@ RUNS_DIR = ROOT / "runs"
 # mounted skill is the only one the agent can route to.
 CODEX_HOME_ALLOWLIST = ("auth.json", "config.toml")
 
+# Default per-file size cap for judge input injection. Fixtures can
+# override via judge.max_input_bytes; larger caps trade prompt size and
+# judge attention for completeness on big outputs.
+DEFAULT_JUDGE_MAX_INPUT_BYTES = 32 * 1024
+
 
 # ---------------------------------------------------------------- yaml-lite
 
@@ -272,11 +277,63 @@ def detect_dollar_support(cli: str) -> bool:
     return cli == "codex"
 
 
-def build_judge_prompt(rubric_text: str) -> str:
-    return (
-        "You are grading your own just-completed work against a rubric. "
-        "Be honest and critical.\n\n<rubric>\n" + rubric_text + "\n</rubric>\n"
+def build_judge_prompt(rubric_text: str, workdir: Path,
+                       inputs: list | None = None,
+                       max_input_bytes: int = DEFAULT_JUDGE_MAX_INPUT_BYTES
+                       ) -> tuple[str, list[dict]]:
+    """Build the judge prompt, optionally injecting declared input files.
+
+    With `inputs` (a list of {path, label} mappings resolved against
+    `workdir`), the judge receives the files' contents explicitly and
+    no longer depends on remembering a prior task. Files larger than
+    `max_input_bytes` are truncated with a marker. Returns (prompt,
+    injections) where `injections` records what was injected (or why
+    not) for the trace.
+
+    Declared inputs that do not exist abort the run: they are part of
+    the evaluation contract, and silently skipping them would let a
+    stale fixture keep producing misleading scores.
+    """
+    prompt = (
+        "You are an external grader evaluating an agent's work against "
+        "a rubric. The files below are the agent's declared outputs; "
+        "grade only against them and the rubric, and be honest and "
+        "critical.\n\n<rubric>\n" + rubric_text + "\n</rubric>\n"
     )
+    injections: list[dict] = []
+    if not inputs:
+        return prompt, injections
+
+    sections = []
+    for entry in inputs:
+        rel = entry.get("path")
+        label = entry.get("label", rel)
+        target = workdir / rel
+        if not target.exists():
+            raise SystemExit(
+                f"judge input declared but not found: {rel} "
+                f"(label '{label}'). The fixture's judge.inputs must "
+                "match files the task actually produces.")
+        raw = target.read_bytes()
+        truncated = len(raw) > max_input_bytes
+        content = raw[:max_input_bytes].decode("utf-8", errors="replace")
+        if truncated:
+            content += (f"\n\n[truncated at {max_input_bytes} bytes; "
+                        f"full size {len(raw)}]")
+        sections.append(
+            f'<file label="{label}" path="{rel}">\n{content}\n</file>')
+        injections.append({
+            "path": rel, "label": label,
+            "bytes": len(raw), "truncated": truncated,
+        })
+    return prompt + "\n" + "\n\n".join(sections) + "\n", injections
+
+
+def resolve_judge_cli(args_judge_cli: str | None,
+                      fixture_judge_cli: str | None,
+                      agent_cli: str) -> str:
+    """Pick the judge CLI: command line > fixture > agent CLI."""
+    return args_judge_cli or fixture_judge_cli or agent_cli
 
 
 def agent_cmd(cli: str, prompt: str, workdir: Path) -> list[str]:
@@ -375,8 +432,15 @@ def cmd_run(args):
     runs = int(args.runs or spec.get("runs", 3))
     task_text = (fixture_dir / spec["task"]).read_text(encoding="utf-8")
     rubric_text = ""
-    if spec.get("judge") and not args.ci:
-        rubric_text = (fixture_dir / spec["judge"]["rubric"]).read_text(encoding="utf-8")
+    judge_spec = spec.get("judge") or {}
+    judge_inputs = judge_spec.get("inputs")
+    judge_max_bytes = int(
+        judge_spec.get("max_input_bytes", DEFAULT_JUDGE_MAX_INPUT_BYTES))
+    judge_cli = resolve_judge_cli(
+        getattr(args, "judge_cli", None), judge_spec.get("cli"), args.cli)
+    if judge_spec and not args.ci:
+        rubric_text = (fixture_dir / judge_spec["rubric"]).read_text(
+            encoding="utf-8")
 
     mount = getattr(args, "mount", None)
     if mount is not None:
@@ -434,29 +498,46 @@ def cmd_run(args):
 
         judge_result = None
         judge_trace = None
+        judge_error = None
+        judge_injections: list[dict] = []
         if rubric_text and task_trace["exit"] == 0:
-            # Judge runs against the same mounted environment so the
-            # skill's rubric-grading path matches the task path.
+            # The judge may be a different CLI than the agent under
+            # test; only give it a mounted CODEX_HOME when it is codex.
             judge_home = None
-            if mount == "codex":
+            if mount == "codex" and judge_cli == "codex":
                 judge_home, _ = build_codex_home(
                     skill_dir, skill_name,
                     Path(os.environ.get("CODEX_HOME",
                                         str(Path.home() / ".codex"))))
             try:
+                judge_prompt, judge_injections = build_judge_prompt(
+                    rubric_text, workdir,
+                    inputs=judge_inputs, max_input_bytes=judge_max_bytes)
                 judge_trace = invoke_agent(
-                    args.cli, build_judge_prompt(rubric_text), workdir,
+                    judge_cli, judge_prompt, workdir,
                     codex_home=judge_home)
             finally:
                 if judge_home is not None:
                     cleanup_codex_home(judge_home)
-            judge_result = extract_json(judge_trace["stdout"])
+            if judge_trace["exit"] != 0:
+                judge_error = (
+                    f"judge CLI '{judge_cli}' exited "
+                    f"{judge_trace['exit']}: "
+                    f"{judge_trace['stderr'][:200]}")
+            else:
+                judge_result = extract_json(judge_trace["stdout"])
+                if judge_result is None:
+                    judge_error = (
+                        f"judge CLI '{judge_cli}' returned no JSON "
+                        "object in stdout")
 
         trace_gz = run_dir / f"attempt-{i}.trace.json.gz"
         with gzip.open(trace_gz, "wt", encoding="utf-8") as fh:
             json.dump({
                 "task": task_trace,
                 "judge": judge_trace,
+                "judge_cli": judge_cli,
+                "judge_inputs": judge_injections if judge_inputs else "none",
                 "mount": {
                     "enabled": mount == "codex",
                     "copied": mount_copied,
@@ -472,6 +553,7 @@ def cmd_run(args):
             "asserts_passed": sum(1 for a in asserts if a["ok"]),
             "asserts_total": len(asserts),
             "judge": judge_result,
+            "judge_error": judge_error,
             "workdir": str(workdir),
             "trace": trace_gz.name,
         })
@@ -479,7 +561,8 @@ def cmd_run(args):
         print(f"[attempt {i}] asserts {status} "
               f"({attempts[-1]['asserts_passed']}/{attempts[-1]['asserts_total']})"
               + (f" mount={trigger_mode}" if trigger_mode else "")
-              + (f" judge={judge_result.get('total')}" if judge_result else ""))
+              + (f" judge={judge_result.get('total')}" if judge_result else "")
+              + (f" JUDGE-ERROR" if judge_error else ""))
 
         if not args.keep_workdirs and task_trace["exit"] == 0:
             shutil.rmtree(workdir, ignore_errors=True)
@@ -490,6 +573,7 @@ def cmd_run(args):
         "skill": str(skill_dir),
         "cli": args.cli,
         "mount": mount,
+        "judge_cli": judge_cli if rubric_text else None,
         "ci_mode": args.ci,
         "timestamp": stamp,
         "attempts": attempts,
@@ -553,6 +637,11 @@ def main():
                             "implemented; combine with '--cli mock' to "
                             "validate mount/cleanup logic without a live "
                             "agent.")
+    p_run.add_argument("--judge-cli", default=None,
+                       choices=["codex", "claude", "mock"],
+                       help="CLI used for judge calls. Overrides the "
+                            "fixture's judge.cli; defaults to --cli "
+                            "(the agent under test).")
     p_run.add_argument("--runs", type=int, default=None)
     p_run.add_argument("--ci", action="store_true",
                        help="deterministic asserts only; exit non-zero on failure")

@@ -14,15 +14,123 @@
   td, th { border: 1px solid #eee; padding: .3rem .5rem; text-align: left; }
   tr.fail td { background: #fdecec; }
   tr.pass td { background: #eefaf2; }
+  td.judge-error { background: #fff3cd; color: #7a5c00;
+                    font-family: monospace; font-size: .85em; }
   code { background: #f4f4f4; padding: 0 .3em; border-radius: 3px; }
 </style></head><body>
-<h1>eval-skill report &middot; 2 run(s)</h1>
+<h1>eval-skill report &middot; 9 run(s)</h1>
 
+<section class="card pass">
+  <h2>20260804-183103-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>claude</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-182735-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='fail'><td>0</td><td>3/3</td><td>-</td><td class='judge-error'>judge CLI &#x27;claude&#x27; exited -1: CLI not found on PATH: claude</td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-182735-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>mock</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-182646-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-182646-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-182404-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-182404-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    judge <code>mock</code> &middot; 
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-143438-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-143438-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-143138-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-143138-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>-</b>
+  </div>
+  <div class='delta'>vs baseline 20260804-142752-edit-article-clarity: pass-rate +0.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>-</td><td></td></tr>
+  </table>
+</section>
+<section class="card pass">
+  <h2>20260804-142752-edit-article-clarity</h2>
+  <div class="meta">
+    skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
+    cli <code>mock</code> &middot;
+    
+    pass-rate <b>100%</b> &middot;
+    judge avg <b>4.00</b>
+  </div>
+  <div class='delta'>vs baseline 20260731-164529-edit-article-clarity: pass-rate +1.00</div>
+  <table>
+    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    <tr class='pass'><td>0</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr><tr class='pass'><td>1</td><td>3/3</td><td>4.00</td><td>mock judge</td></tr>
+  </table>
+</section>
 <section class="card fail">
   <h2>20260731-164529-edit-article-clarity</h2>
   <div class="meta">
     skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
     cli <code>mock</code> &middot;
+    
     pass-rate <b>0%</b> &middot;
     judge avg <b>-</b>
   </div>
@@ -37,6 +145,7 @@
   <div class="meta">
     skill <code>C:\Users\15479\.codex\skills\edit-article</code> &middot;
     cli <code>mock</code> &middot;
+    
     pass-rate <b>100%</b> &middot;
     judge avg <b>4.00</b>
   </div>

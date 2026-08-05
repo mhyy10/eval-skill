@@ -139,6 +139,76 @@ class TestMountedPrompt(unittest.TestCase):
             del os.environ["EVAL_DOLLAR_SUPPORT"]
 
 
+class TestJudgePrompt(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        (self.tmp / "output").mkdir()
+        (self.tmp / "input").mkdir()
+        (self.tmp / "output" / "edited.md").write_text(
+            "# Edited\n\nTight content.\n", encoding="utf-8")
+        (self.tmp / "input" / "draft.md").write_text(
+            "Rambling draft...\n", encoding="utf-8")
+
+    def test_no_inputs_returns_rubric_only(self):
+        prompt, injections = eval_mod.build_judge_prompt(
+            "RUBRIC", self.tmp, inputs=None)
+        self.assertIn("<rubric>\nRUBRIC\n</rubric>", prompt)
+        self.assertNotIn("<file", prompt)
+        self.assertEqual(injections, [])
+
+    def test_inputs_injected_with_labels(self):
+        prompt, injections = eval_mod.build_judge_prompt(
+            "RUBRIC", self.tmp,
+            inputs=[{"path": "output/edited.md", "label": "edited"},
+                    {"path": "input/draft.md", "label": "original"}])
+        self.assertIn('<file label="edited" path="output/edited.md">',
+                      prompt)
+        self.assertIn("Tight content.", prompt)
+        self.assertIn('<file label="original" path="input/draft.md">',
+                      prompt)
+        self.assertIn("Rambling draft...", prompt)
+        self.assertEqual(len(injections), 2)
+        self.assertFalse(injections[0]["truncated"])
+
+    def test_missing_input_aborts(self):
+        with self.assertRaises(SystemExit):
+            eval_mod.build_judge_prompt(
+                "RUBRIC", self.tmp,
+                inputs=[{"path": "output/missing.md", "label": "x"}])
+
+    def test_truncation_marks_content(self):
+        big = "x" * 100
+        (self.tmp / "output" / "big.md").write_text(big, encoding="utf-8")
+        prompt, injections = eval_mod.build_judge_prompt(
+            "RUBRIC", self.tmp,
+            inputs=[{"path": "output/big.md", "label": "big"}],
+            max_input_bytes=10)
+        self.assertIn("[truncated at 10 bytes; full size 100]", prompt)
+        self.assertTrue(injections[0]["truncated"])
+        self.assertEqual(injections[0]["bytes"], 100)
+
+    def test_label_defaults_to_path(self):
+        prompt, injections = eval_mod.build_judge_prompt(
+            "RUBRIC", self.tmp,
+            inputs=[{"path": "output/edited.md"}])
+        self.assertIn('label="output/edited.md"', prompt)
+
+
+class TestResolveJudgeCli(unittest.TestCase):
+    def test_command_line_wins(self):
+        self.assertEqual(
+            eval_mod.resolve_judge_cli("claude", "codex", "mock"),
+            "claude")
+
+    def test_fixture_beats_agent_cli(self):
+        self.assertEqual(
+            eval_mod.resolve_judge_cli(None, "codex", "mock"), "codex")
+
+    def test_defaults_to_agent_cli(self):
+        self.assertEqual(
+            eval_mod.resolve_judge_cli(None, None, "mock"), "mock")
+
+
 class TestYamlLite(unittest.TestCase):
     def test_scalars(self):
         spec = parse_simple_yaml("name: foo\nruns: 3\nratio: 1.5\nflag: true\n")
@@ -191,6 +261,9 @@ class TestYamlLite(unittest.TestCase):
         self.assertEqual(spec["assert"][1]["patterns"],
                          ["(?i)in conclusion", "(?i)as mentioned earlier"])
         self.assertEqual(spec["judge"]["max_score"], 5)
+        self.assertEqual(spec["judge"]["inputs"],
+                         [{"path": "output/edited.md", "label": "edited"},
+                          {"path": "input/draft.md", "label": "original"}])
 
 
 class TestAssertions(unittest.TestCase):
