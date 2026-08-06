@@ -349,6 +349,24 @@ class TestExtractJson(unittest.TestCase):
     def test_malformed(self):
         self.assertIsNone(extract_json("{not json}"))
 
+    def test_nested_object(self):
+        """extract_json should handle nested braces correctly."""
+        out = extract_json('{"scores": {"structure": 4, "clarity": 5}, "total": 4}')
+        self.assertEqual(out["total"], 4)
+        self.assertEqual(out["scores"]["structure"], 4)
+        self.assertEqual(out["scores"]["clarity"], 5)
+
+    def test_deeply_nested(self):
+        """Should handle deeply nested JSON."""
+        out = extract_json('prefix {"a": {"b": {"c": 1}}} suffix')
+        self.assertEqual(out["a"]["b"]["c"], 1)
+
+    def test_string_with_braces(self):
+        """Should not be confused by braces inside strings."""
+        out = extract_json('{"notes": "use {braces} carefully", "total": 3}')
+        self.assertEqual(out["total"], 3)
+        self.assertIn("{braces}", out["notes"])
+
 
 class TestMockAgent(unittest.TestCase):
     def test_task_prompt_materializes_output(self):

@@ -69,6 +69,53 @@ class TestAvg(unittest.TestCase):
         self.assertEqual(report.avg([4, None, "x", 2]), 3.0)
 
 
+class TestSubAxisHelpers(unittest.TestCase):
+    def test_collect_sub_axes_finds_all_axes(self):
+        runs = [{
+            "attempts": [
+                {"judge": {"structure": 4, "clarity": 5, "fidelity": 3,
+                          "total": 4, "notes": "good"}},
+                {"judge": {"structure": 5, "clarity": 4, "fidelity": 4,
+                          "total": 4.3, "notes": "better"}}
+            ]
+        }]
+        axes = report.collect_sub_axes(runs)
+        self.assertIn("structure", axes)
+        self.assertIn("clarity", axes)
+        self.assertIn("fidelity", axes)
+        self.assertNotIn("total", axes)
+        self.assertNotIn("notes", axes)
+
+    def test_collect_sub_axes_handles_missing_judge(self):
+        runs = [{
+            "attempts": [
+                {"judge": None},
+                {"judge": {"structure": 4, "total": 4}}
+            ]
+        }]
+        axes = report.collect_sub_axes(runs)
+        self.assertEqual(axes, ["structure"])
+
+    def test_attempt_sub_score(self):
+        judge = {"structure": 4, "clarity": 5, "total": 4.5}
+        self.assertEqual(report.attempt_sub_score(judge, "structure"), 4)
+        self.assertEqual(report.attempt_sub_score(judge, "clarity"), 5)
+        self.assertIsNone(report.attempt_sub_score(judge, "fidelity"))
+        self.assertIsNone(report.attempt_sub_score(None, "structure"))
+
+    def test_run_sub_axis_avg(self):
+        run = {
+            "attempts": [
+                {"judge": {"structure": 4, "clarity": 5}},
+                {"judge": {"structure": 5, "clarity": 4}},
+                {"judge": {"structure": 3}}
+            ]
+        }
+        self.assertEqual(report.run_sub_axis_avg(run, "structure"), 4.0)
+        self.assertEqual(report.run_sub_axis_avg(run, "clarity"), 4.5)
+        self.assertIsNone(report.run_sub_axis_avg(run, "fidelity"))
+
+
 class TestRenderSeries(unittest.TestCase):
     def test_dots_for_each_scored_point(self):
         svg = report.render_series(
@@ -114,7 +161,7 @@ class TestRenderTrend(unittest.TestCase):
         html = report.render_trend(runs)
         self.assertEqual(html.count("<svg"), 2)
         self.assertIn("assert pass-rate", html)
-        self.assertIn("judge avg", html)
+        self.assertIn("judge total", html)
 
     def test_runs_sorted_by_run_id(self):
         runs = [make_run("r2-zzz", judge_scores=[5]),
@@ -126,7 +173,7 @@ class TestRenderTrend(unittest.TestCase):
         runs = [make_run("r1", judge_scores=[4]), make_run("r2")]
         html = report.render_trend(runs)
         self.assertIn("<title>r1: 4.0</title>", html)
-        judge_svg = html.split("judge avg</div>", 1)[1]
+        judge_svg = html.split("judge total</div>", 1)[1]
         self.assertNotIn("<title>r2:", judge_svg)
 
 

@@ -462,13 +462,49 @@ def invoke_agent(cli: str, prompt: str, workdir: Path,
 
 
 def extract_json(text: str):
-    m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-    if not m:
+    """Extract the first JSON object from text, handling nested braces.
+    
+    Uses a stack to find matching braces instead of a simple regex, so it
+    can handle nested objects like {"scores": {"structure": 4}, "total": 4}.
+    """
+    start = text.find("{")
+    if start == -1:
         return None
-    try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
+    
+    depth = 0
+    in_string = False
+    escape_next = False
+    
+    for i in range(start, len(text)):
+        char = text[i]
+        
+        if escape_next:
+            escape_next = False
+            continue
+        
+        if char == "\\" and in_string:
+            escape_next = True
+            continue
+        
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        
+        if in_string:
+            continue
+        
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start:i+1]
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    return None
+    
+    return None
 
 
 # ---------------------------------------------------------------- commands

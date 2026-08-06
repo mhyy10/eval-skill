@@ -1,0 +1,23 @@
+name: edit-article-structure
+description: Test that edit-article reorders sections to respect dependencies (background before problem before solution)
+task: task.md
+assert:
+  - type: file_exists
+    path: output/edited.md
+  - type: file_contains
+    path: output/edited.md
+    patterns:
+      - "(?i)背景|background"
+      - "(?i)问题|problem"
+      - "(?i)解决|solution"
+  - type: file_not_exists
+    path: output/edited.md.backup
+judge:
+  rubric: rubric.md
+  max_score: 5
+  inputs:
+    - path: output/edited.md
+      label: edited
+    - path: input/draft.md
+      label: original
+runs: 3

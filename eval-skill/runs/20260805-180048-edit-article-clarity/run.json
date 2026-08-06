@@ -1,0 +1,49 @@
+{
+  "run_id": "20260805-180048-edit-article-clarity",
+  "fixture": "edit-article-clarity",
+  "skill": "C:\\Users\\15479\\.codex\\skills\\edit-article",
+  "cli": "codex",
+  "mount": null,
+  "judge_cli": "codex",
+  "ci_mode": false,
+  "timestamp": "20260805-180048",
+  "attempts": [
+    {
+      "index": 0,
+      "agent_exit": 0,
+      "asserts": [
+        {
+          "type": "file_exists",
+          "ok": true,
+          "detail": "output/edited.md found"
+        },
+        {
+          "type": "file_not_contains",
+          "ok": true,
+          "detail": "2 pattern(s) ok"
+        },
+        {
+          "type": "file_min_lines",
+          "ok": true,
+          "detail": "29 lines (need >= 10)"
+        }
+      ],
+      "asserts_passed": 3,
+      "asserts_total": 3,
+      "judge": {
+        "structure": 5,
+        "clarity": 5,
+        "fidelity": 3,
+        "total": 4,
+        "notes": "Structure is strong: the intro names both causes, dedicated sections explain tests then the build, and the fix section resolves them in order, with only backward references and no forward dependencies. Clarity is excellent: every paragraph is well under 240 characters, and the draft's filler ('as mentioned earlier', 'in conclusion', circular restatements) is gone. Fidelity is the weak axis. Nearly all draft claims survive (sequential tests summing durations, full rebuilds despite unchanged packages, caching definition, parallelize/cache fixes, the two main reasons), and the causal ordering is actually improved. However, the edit invents at least one unsupported factual claim: 'This is the single largest contributor' asserts a ranking the draft never makes (the draft only says tests and build are 'the two main reasons'), and 'it grows worse with every test we add' is an extrapolation beyond the draft's 'sum of all the times.' The claim that caching 'would let unchanged packages skip the rebuild entirely' is a mild but defensible inference. Because fidelity matters most and the invented superlative is a genuine fabrication, fidelity scores 3; the overall score lands at 4 given the otherwise faithful and much clearer rewrite."
+      },
+      "judge_error": null,
+      "workdir": "C:\\Users\\15479\\AppData\\Local\\Temp\\eval-edit-article-clarity-0-ak0a72ry",
+      "trace": "attempt-0.trace.json.gz"
+    }
+  ],
+  "asserts_pass_rate": 1.0,
+  "judge_scores": [
+    4
+  ]
+}

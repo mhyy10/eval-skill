@@ -31,6 +31,41 @@ def row_class(ok):
     return "pass" if ok else "fail"
 
 
+def collect_sub_axes(runs) -> list[str]:
+    """Find all judge sub-axis keys across runs, preserving first-seen order.
+    
+    Excludes 'total' and 'notes' which are rendered separately.
+    Returns axis names in the order they first appear."""
+    seen = set()
+    axes = []
+    skip = {"total", "notes"}
+    for run in runs:
+        for attempt in run.get("attempts", []):
+            judge = attempt.get("judge")
+            if not judge or not isinstance(judge, dict):
+                continue
+            for key in judge:
+                if key not in skip and key not in seen:
+                    seen.add(key)
+                    axes.append(key)
+    return axes
+
+
+def attempt_sub_score(judge, axis: str):
+    """Get a sub-axis score from a judge dict, or None."""
+    if not judge or not isinstance(judge, dict):
+        return None
+    v = judge.get(axis)
+    return v if isinstance(v, (int, float)) else None
+
+
+def run_sub_axis_avg(run, axis: str):
+    """Average a sub-axis across all scored attempts in a run."""
+    scores = [attempt_sub_score(a.get("judge"), axis)
+              for a in run.get("attempts", [])]
+    return avg(scores)
+
+
 # ---------------------------------------------------------------- grouping
 
 def group_key(run) -> tuple:
@@ -131,26 +166,48 @@ def render_series(points, y_min, y_max, color, value_fmt) -> str:
 
 
 def render_trend(group_runs_list) -> str:
-    """Dual-subplot trend for one group: assert pass-rate on top,
-    judge average below. Groups with fewer than two runs get a
-    placeholder explaining why no trend is shown."""
+    """Trend charts for one group: assert pass-rate, judge total, and
+    sub-axes (structure/clarity/fidelity). Groups with fewer than two
+    runs get a placeholder."""
     runs = sorted(group_runs_list, key=lambda r: r["run_id"])
     if len(runs) < 2:
         return ("<div class='trend-placeholder'>"
                 "需要 &ge;2 个同配置 run 才能显示趋势；"
                 "当前该组只有 " + str(len(runs)) + " 个 run。"
                 "</div>")
+    
     pr_points = [(r["run_id"], r["asserts_pass_rate"]) for r in runs]
     judge_points = [
         (r["run_id"], avg(r.get("judge_scores") or [])) for r in runs]
-    top = render_series(pr_points, 0, 1, "#2e9e5b",
-                        lambda v: f"{v * 100:.0f}%")
-    bottom = render_series(judge_points, 1, 5, "#3a6ea5",
-                           lambda v: f"{v:.1f}")
-    return (f"<div class='trend'>"
-            f"<div class='trend-title'>assert pass-rate</div>{top}"
-            f"<div class='trend-title'>judge avg</div>{bottom}"
-            f"</div>")
+    
+    # Collect sub-axes from all runs in this group
+    sub_axes = collect_sub_axes(runs)
+    
+    parts = []
+    parts.append(f"<div class='trend-title'>assert pass-rate</div>")
+    parts.append(render_series(pr_points, 0, 1, "#2e9e5b",
+                               lambda v: f"{v * 100:.0f}%"))
+    parts.append(f"<div class='trend-title'>judge total</div>")
+    parts.append(render_series(judge_points, 1, 5, "#3a6ea5",
+                               lambda v: f"{v:.1f}"))
+    
+    # Add one trend line per sub-axis
+    for axis in sub_axes:
+        axis_points = [(r["run_id"], run_sub_axis_avg(r, axis)) for r in runs]
+        # Determine color based on axis name
+        if axis == "structure":
+            color = "#9333ea"  # purple
+        elif axis == "clarity":
+            color = "#0ea5e9"  # sky blue
+        elif axis == "fidelity":
+            color = "#f59e0b"  # amber
+        else:
+            color = "#6b7280"  # gray
+        parts.append(f"<div class='trend-title'>{axis}</div>")
+        parts.append(render_series(axis_points, 1, 5, color,
+                                   lambda v: f"{v:.1f}"))
+    
+    return f"<div class='trend'>{''.join(parts)}</div>"
 
 
 # ---------------------------------------------------------------- render
@@ -172,6 +229,9 @@ def render(runs) -> str:
     for gi, key in enumerate(order):
         g_runs = groups[key]
         trend_html = render_trend(g_runs)
+        # Collect sub-axes for this group to show in attempt tables
+        sub_axes = collect_sub_axes(g_runs)
+        
         cards = []
         for i, run in enumerate(reversed(g_runs)):
             attempts = run["attempts"]
@@ -188,33 +248,67 @@ def render(runs) -> str:
                 d_judge = (judge_avg - prev_judge) if (
                     judge_avg is not None and prev_judge is not None
                 ) else None
+                
+                # Also show sub-axis deltas if available
+                sub_deltas = []
+                for axis in sub_axes:
+                    curr = run_sub_axis_avg(run, axis)
+                    prev_val = run_sub_axis_avg(prev, axis)
+                    if curr is not None and prev_val is not None:
+                        delta = curr - prev_val
+                        sign = "+" if delta >= 0 else ""
+                        sub_deltas.append(
+                            f"{axis} {sign}{fmt(delta)}")
+                
                 baseline_html = (
                     f"<div class='delta'>vs baseline "
                     f"{html.escape(prev['run_id'])}: "
                     f"pass-rate {'+' if d_pr >= 0 else ''}{fmt(d_pr)}"
                     + (f", judge {'+' if d_judge >= 0 else ''}"
                        f"{fmt(d_judge)}" if d_judge is not None else "")
+                    + ((", " + ", ".join(sub_deltas)) if sub_deltas else "")
                     + "</div>"
                 )
 
-            rows = "".join(
-                "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td>"
-                "<td%s>%s</td></tr>" % (
-                    row_class(a["asserts_passed"] == a["asserts_total"]
-                              and not a.get("judge_error")),
-                    a["index"], a["asserts_passed"], a["asserts_total"],
-                    fmt((a["judge"] or {}).get("total"))
-                    if a["judge"] else "-",
-                    " class='judge-error'"
-                    if a.get("judge_error") else "",
-                    (html.escape(a["judge_error"][:120])
-                     if a.get("judge_error")
-                     else html.escape(
-                         ((a["judge"] or {}).get("notes", "")[:120]))
-                     if a["judge"] else ""),
+            # Build table header with sub-axes
+            header_cols = ["#", "asserts", "judge"]
+            for axis in sub_axes:
+                header_cols.append(axis)
+            header_cols.append("notes")
+            header_html = "<tr>" + "".join(
+                f"<th>{col}</th>" for col in header_cols) + "</tr>"
+            
+            # Build rows
+            rows = ""
+            for a in attempts:
+                judge = a.get("judge")
+                judge_total = fmt((judge or {}).get("total")) if judge else "-"
+                
+                # Sub-axis cells
+                sub_cells = ""
+                for axis in sub_axes:
+                    score = attempt_sub_score(judge, axis)
+                    sub_cells += f"<td>{fmt(score) if score is not None else '-'}</td>"
+                
+                rows += (
+                    "<tr class='%s'><td>%d</td><td>%d/%d</td><td>%s</td>"
+                    "%s"
+                    "<td%s>%s</td></tr>" % (
+                        row_class(a["asserts_passed"] == a["asserts_total"]
+                                  and not a.get("judge_error")),
+                        a["index"], a["asserts_passed"], a["asserts_total"],
+                        judge_total,
+                        sub_cells,
+                        " class='judge-error'"
+                        if a.get("judge_error") else "",
+                        (html.escape(a["judge_error"][:120])
+                         if a.get("judge_error")
+                         else html.escape(
+                             ((a["judge"] or {}).get("notes", "")[:120]))
+                         if a["judge"] else ""),
+                    )
                 )
-                for a in attempts
-            )
+            
             judge_cli = run.get("judge_cli")
             cards.append(f"""
 <section class="card {'pass' if pass_rate == 1.0 else 'fail'}">
@@ -229,7 +323,7 @@ def render(runs) -> str:
   </div>
   {baseline_html}
   <table>
-    <tr><th>#</th><th>asserts</th><th>judge</th><th>notes</th></tr>
+    {header_html}
     {rows}
   </table>
 </section>""")
